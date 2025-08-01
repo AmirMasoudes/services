@@ -884,12 +884,12 @@ async def my_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 response += (
                     f"{status_emoji} **{order.plans.name}**\n"
-                    f"💰 قیمت: {order.plans.price:,} تومان\n"
-                    f"📊 حجم: {order.plans.in_volume} مگابایت\n"
-                    f"📅 شروع: {order.start_plane_at.strftime('%Y/%m/%d')}\n"
-                    f"📅 پایان: {order.end_plane_at.strftime('%Y/%m/%d')}\n"
-                    f"🔸 وضعیت: {status}\n\n"
-                )
+                f"💰 قیمت: {order.plans.price:,} تومان\n"
+                f"📊 حجم: {order.plans.in_volume} مگابایت\n"
+                f"📅 شروع: {order.start_plane_at.strftime('%Y/%m/%d')}\n"
+                f"📅 پایان: {order.end_plane_at.strftime('%Y/%m/%d')}\n"
+                f"🔸 وضعیت: {status}\n\n"
+            )
         else:
             response += "❗ هیچ پلن پولی یافت نشد.\n\n"
         
@@ -1155,7 +1155,7 @@ async def main():
     app.add_handler(CallbackQueryHandler(lambda u, c: trial_plan(u, c), pattern="^get_trial$"))
     app.add_handler(CallbackQueryHandler(lambda u, c: buy_plan(u, c), pattern="^view_plans$"))
     app.add_handler(CallbackQueryHandler(lambda u, c: profile(u, c), pattern="^view_profile$"))
-
+    
     # پردازش رسید پرداخت
     app.add_handler(MessageHandler(filters.PHOTO, handle_payment_receipt))
     
