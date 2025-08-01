@@ -3,6 +3,7 @@ from core.models import BaseModel, TimeStampMixin, SoftDeleteModel
 from accounts.models import UsersModel
 from order.models import OrderUserModel
 from conf.models import TrialConfigModel
+from plan.models import ConfingPlansModel
 
 class XUIServer(BaseModel, TimeStampMixin, SoftDeleteModel):
     """سرور X-UI"""
@@ -26,6 +27,9 @@ class UserConfig(BaseModel, TimeStampMixin, SoftDeleteModel):
     config_data = models.TextField(help_text="داده‌های کانفیگ (vmess/vless)")
     is_active = models.BooleanField(default=True, help_text="آیا کانفیگ فعال است؟")
     expires_at = models.DateTimeField(null=True, blank=True, help_text="تاریخ انقضا")
+    protocol = models.CharField(max_length=20, default="vless", help_text="پروتکل کانفیگ")
+    plan = models.ForeignKey(ConfingPlansModel, on_delete=models.SET_NULL, null=True, blank=True, help_text="پلن مرتبط")
+    is_trial = models.BooleanField(default=False, help_text="آیا کانفیگ تستی است؟")
     
     def __str__(self):
         return f"{self.user.get_display_name()} - {self.config_name}"
