@@ -10,5 +10,11 @@ ADMIN_BOT_TOKEN=8450508816:AAFE6XAj8QvA9iIP12whrKxYRtgsoHFCiFU
 # Admin Password
 ADMIN_PASSWORD=admin123
 
+# X-UI Server Settings (اختیاری)
+XUI_SERVER_HOST=your-server-ip.com
+XUI_SERVER_PORT=54321
+XUI_USERNAME=admin
+XUI_PASSWORD=your-password
+
 # Database (optional - for production)
 # DATABASE_URL=postgresql://user:password@localhost:5432/dbname 
