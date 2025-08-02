@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
 from .models import OrderUserModel, PayMentModel
+import locale
 
 
 class PaymentInline(admin.TabularInline):
@@ -55,11 +56,21 @@ class OrderUserAdmin(admin.ModelAdmin):
     def plan_display(self, obj):
         """نمایش اطلاعات پلن"""
         if obj.plans:
-            return format_html(
-                '<strong>{}</strong><br><small>{:,} تومان</small>',
-                obj.plans.name,
-                obj.plans.price
-            )
+            try:
+                # Use locale formatting for better compatibility
+                formatted_price = locale.format_string("%d", int(obj.plans.price) if obj.plans.price is not None else 0, grouping=True)
+                return format_html(
+                    '<strong>{}</strong><br><small>{} تومان</small>',
+                    obj.plans.name,
+                    formatted_price
+                )
+            except (ValueError, TypeError):
+                # Fallback to simple formatting
+                return format_html(
+                    '<strong>{}</strong><br><small>{} تومان</small>',
+                    obj.plans.name,
+                    str(obj.plans.price) if obj.plans.price is not None else '0'
+                )
         return '-'
     plan_display.short_description = 'پلن'
     plan_display.admin_order_field = 'plans__name'
@@ -159,11 +170,21 @@ class PaymentAdmin(admin.ModelAdmin):
     def order_display(self, obj):
         """نمایش اطلاعات سفارش"""
         if obj.order and obj.order.plans:
-            return format_html(
-                '<strong>{}</strong><br><small>{:,} تومان</small>',
-                obj.order.plans.name,
-                obj.order.plans.price
-            )
+            try:
+                # Use locale formatting for better compatibility
+                formatted_price = locale.format_string("%d", int(obj.order.plans.price) if obj.order.plans.price is not None else 0, grouping=True)
+                return format_html(
+                    '<strong>{}</strong><br><small>{} تومان</small>',
+                    obj.order.plans.name,
+                    formatted_price
+                )
+            except (ValueError, TypeError):
+                # Fallback to simple formatting
+                return format_html(
+                    '<strong>{}</strong><br><small>{} تومان</small>',
+                    obj.order.plans.name,
+                    str(obj.order.plans.price) if obj.order.plans.price is not None else '0'
+                )
         return '-'
     order_display.short_description = 'سفارش'
     

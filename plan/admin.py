@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import ConfingPlansModel
+import locale
 
 
 @admin.register(ConfingPlansModel)
@@ -32,7 +33,15 @@ class PlanAdmin(admin.ModelAdmin):
     
     def price_display(self, obj):
         """نمایش قیمت با فرمت مناسب"""
-        return format_html('<strong>{:,}</strong> تومان', obj.price)
+        if obj.price is not None:
+            try:
+                # Use locale formatting for better compatibility
+                formatted_price = locale.format_string("%d", int(obj.price), grouping=True)
+                return format_html('<strong>{}</strong> تومان', formatted_price)
+            except (ValueError, TypeError):
+                # Fallback to simple formatting
+                return format_html('<strong>{}</strong> تومان', str(obj.price))
+        return format_html('<strong>نامشخص</strong>')
     price_display.short_description = 'قیمت'
     price_display.admin_order_field = 'price'
     
