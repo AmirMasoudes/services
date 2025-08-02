@@ -145,14 +145,7 @@ class XUIService:
             print(f"📊 داده ارسالی: {json.dumps(inbound_data, indent=2)}")
             
             # تست endpoint های مختلف برای ایجاد inbound
-            add_endpoints = [
-                "/panel/api/inbounds/add",
-                "/panel/inbounds/add",
-                "/api/inbounds/add",
-                "/inbounds/add",
-                "/api/inbound/add", 
-                "/inbound/add"
-            ]
+            add_endpoints = ["/panel/api/inbounds/add"]
             
             for endpoint in add_endpoints:
                 try:

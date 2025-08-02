@@ -6,6 +6,7 @@
 import os
 import sys
 import django
+import requests
 import subprocess
 from datetime import datetime
 
@@ -16,6 +17,7 @@ django.setup()
 from plan.models import ConfingPlansModel
 from accounts.models import UsersModel
 from xui_servers.models import XUIServer
+from xui_servers.services import XUIService
 
 def test_plans():
     """تست پلن‌ها"""
@@ -182,6 +184,41 @@ def test_bot_processes():
         print("❌ هیچ پروسه‌ای از بات‌ها یافت نشد")
         return False
 
+def test_web_services():
+    """تست وب سرویس‌ها"""
+    print("\n🌐 تست وب سرویس‌ها:")
+    print("=" * 30)
+    
+    # Django Admin
+    try:
+        response = requests.get("http://127.0.0.1:8000/admin/", timeout=5)
+        if response.status_code == 302:
+            print("✅ Django Admin: کار می‌کند")
+        else:
+            print(f"⚠️ Django Admin: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Django Admin: {e}")
+    
+    # Nginx
+    try:
+        response = requests.get("http://38.54.105.124/admin/", timeout=5)
+        if response.status_code == 302:
+            print("✅ Nginx: کار می‌کند")
+        else:
+            print(f"⚠️ Nginx: {response.status_code}")
+    except Exception as e:
+        print(f"❌ Nginx: {e}")
+    
+    # X-UI Panel
+    try:
+        response = requests.get("http://38.54.105.124:54321/MsxZ4xuIy5xLfQtsSC/", timeout=5)
+        if response.status_code == 200:
+            print("✅ X-UI Panel: کار می‌کند")
+        else:
+            print(f"⚠️ X-UI Panel: {response.status_code}")
+    except Exception as e:
+        print(f"❌ X-UI Panel: {e}")
+
 def main():
     """تابع اصلی"""
     print("🎉 تست نهایی کامل سیستم Django VPN")
@@ -210,6 +247,9 @@ def main():
         except Exception as e:
             print(f"❌ خطا در تست {test_name}: {e}")
     
+    # تست وب سرویس‌ها (بدون شمارش در نتیجه)
+    test_web_services()
+    
     print("\n🎉 نتیجه نهایی:")
     print("=" * 40)
     print(f"✅ تست‌های موفق: {passed_tests}/{total_tests}")
@@ -230,4 +270,4 @@ def main():
     print("\n🎯 سیستم آماده استفاده است!")
 
 if __name__ == "__main__":
-    main() 
+    main()
