@@ -31,14 +31,17 @@ def main():
     print("\n🗄️ راه‌اندازی PostgreSQL...")
     run_cmd("systemctl enable postgresql", "Enable PostgreSQL")
     run_cmd("systemctl start postgresql", "Start PostgreSQL")
-    run_cmd('sudo -u postgres psql -c "CREATE DATABASE configvpn_db;"', "Create database")
-    run_cmd('sudo -u postgres psql -c "CREATE USER configvpn_user WITH PASSWORD \'YourSecurePassword123!@#\';"', "Create user")
-    run_cmd('sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE configvpn_db TO configvpn_user;"', "Grant privileges")
+    
+    # ایجاد دیتابیس و کاربر (بدون sudo)
+    print("\n📊 ایجاد دیتابیس PostgreSQL...")
+    run_cmd('su - postgres -c "psql -c \\"CREATE DATABASE configvpn_db;\\""', "Create database")
+    run_cmd('su - postgres -c "psql -c \\"CREATE USER configvpn_user WITH PASSWORD \\'YourSecurePassword123!@#';\\""', "Create user")
+    run_cmd('su - postgres -c "psql -c \\"GRANT ALL PRIVILEGES ON DATABASE configvpn_db TO configvpn_user;\\""', "Grant privileges")
     
     # 3. راه‌اندازی Redis
     print("\n🔴 راه‌اندازی Redis...")
-    run_cmd("systemctl enable redis", "Enable Redis")
-    run_cmd("systemctl start redis", "Start Redis")
+    run_cmd("systemctl enable redis-server", "Enable Redis server")
+    run_cmd("systemctl start redis-server", "Start Redis server")
     
     # 4. Django setup
     print("\n🐍 راه‌اندازی Django...")
@@ -106,6 +109,8 @@ WantedBy=multi-user.target
     print("\n📊 وضعیت سرویس‌ها:")
     run_cmd("systemctl status django-vpn --no-pager -l", "Django status")
     run_cmd("systemctl status nginx --no-pager -l", "Nginx status")
+    run_cmd("systemctl status redis-server --no-pager -l", "Redis status")
+    run_cmd("systemctl status postgresql --no-pager -l", "PostgreSQL status")
 
 if __name__ == "__main__":
     main() 
