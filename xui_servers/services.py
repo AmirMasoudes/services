@@ -58,12 +58,12 @@ class XUIService:
         try:
             # تست endpoint های مختلف با web base path
             endpoints = [
+                "/panel/api/inbounds/list",
+                "/panel/inbounds/list",
                 "/api/inbounds/list",
                 "/inbounds/list", 
                 "/api/inbound/list",
-                "/inbound/list",
-                "/panel/api/inbounds/list",
-                "/panel/inbounds/list"
+                "/inbound/list"
             ]
             
             for endpoint in endpoints:
@@ -146,12 +146,12 @@ class XUIService:
             
             # تست endpoint های مختلف برای ایجاد inbound
             add_endpoints = [
+                "/panel/api/inbounds/add",
+                "/panel/inbounds/add",
                 "/api/inbounds/add",
                 "/inbounds/add",
                 "/api/inbound/add", 
-                "/inbound/add",
-                "/panel/api/inbounds/add",
-                "/panel/inbounds/add"
+                "/inbound/add"
             ]
             
             for endpoint in add_endpoints:

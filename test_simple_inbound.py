@@ -66,29 +66,39 @@ def test_simple_inbound():
                 
                 print(f"📤 داده ارسالی: {json.dumps(simple_inbound, indent=2)}")
                 
-                # تست endpoint اصلی
-                try:
-                    response = session.post(f"{base_url}/panel/api/inbounds/add", json=simple_inbound, timeout=10)
-                    
-                    print(f"📊 وضعیت پاسخ: {response.status_code}")
-                    print(f"📄 محتوای پاسخ: {response.text}")
-                    
-                    if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            print(f"✅ پاسخ JSON: {json.dumps(data, indent=2)}")
-                            
-                            if data.get('success'):
-                                print("✅ Inbound با موفقیت ایجاد شد!")
-                            else:
-                                print(f"❌ خطا: {data.get('msg', 'خطای نامشخص')}")
-                        except json.JSONDecodeError:
-                            print("❌ پاسخ JSON نامعتبر")
-                    else:
-                        print("❌ خطا در ایجاد inbound")
+                # تست endpoint های مختلف
+                endpoints = [
+                    "/panel/api/inbounds/add",
+                    "/panel/inbounds/add",
+                    "/api/inbounds/add",
+                    "/inbounds/add",
+                    "/api/inbound/add",
+                    "/inbound/add"
+                ]
+                
+                for endpoint in endpoints:
+                    try:
+                        response = session.post(f"{base_url}{endpoint}", json=simple_inbound, timeout=10)
                         
-                except Exception as e:
-                    print(f"❌ خطا در ارسال درخواست: {e}")
+                        print(f"📊 وضعیت پاسخ {endpoint}: {response.status_code}")
+                        print(f"📄 محتوای پاسخ {endpoint}: {response.text}")
+                        
+                        if response.status_code == 200:
+                            try:
+                                data = response.json()
+                                print(f"✅ پاسخ JSON {endpoint}: {json.dumps(data, indent=2)}")
+                                
+                                if data.get('success'):
+                                    print(f"✅ Inbound با موفقیت ایجاد شد با endpoint: {endpoint}")
+                                else:
+                                    print(f"❌ خطا {endpoint}: {data.get('msg', 'خطای نامشخص')}")
+                            except json.JSONDecodeError:
+                                print(f"❌ پاسخ JSON نامعتبر {endpoint}")
+                        else:
+                            print(f"❌ خطا در ایجاد inbound با endpoint: {endpoint}")
+                            
+                    except Exception as e:
+                        print(f"❌ خطا در ارسال درخواست با endpoint {endpoint}: {e}")
                 
                 # تست ایجاد inbound VLess
                 print("\n🔧 تست ایجاد inbound VLess...")
