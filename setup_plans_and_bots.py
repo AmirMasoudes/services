@@ -101,9 +101,11 @@ def show_users():
         for user in users:
             print(f"✅ {user.full_name} (ID: {user.id_tel})")
             print(f"   📱 Username: {user.username_tel}")
-            print(f"   📧 Email: {user.email}")
+            print(f"   🔗 Telegram ID: {user.telegram_id}")
             print(f"   👤 Staff: {user.is_staff}")
             print(f"   🔧 Superuser: {user.is_superuser}")
+            print(f"   🎯 Admin: {user.is_admin}")
+            print(f"   📊 Trial Used: {user.has_used_trial}")
             print("-" * 30)
         
         print(f"\n📊 تعداد کل کاربران: {users.count()}")
