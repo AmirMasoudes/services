@@ -50,10 +50,25 @@ class XUIService:
     def get_inbounds(self):
         """دریافت لیست inbound ها"""
         try:
-            response = self.session.get(f"{self.base_url}/panel/api/inbounds/list")
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('obj', [])
+            # تست endpoint های مختلف
+            endpoints = [
+                "/api/inbounds/list",
+                "/inbounds/list", 
+                "/api/inbound/list",
+                "/inbound/list",
+                "/panel/api/inbounds/list",
+                "/panel/inbounds/list"
+            ]
+            
+            for endpoint in endpoints:
+                try:
+                    response = self.session.get(f"{self.base_url}{endpoint}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data.get('obj', [])
+                except Exception:
+                    continue
+            
             return []
             
         except Exception as e:
@@ -112,16 +127,31 @@ class XUIService:
                 "streamSettings": stream_settings
             }
             
-            response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/add",
-                json=inbound_data,
-                timeout=10
-            )
+            # تست endpoint های مختلف برای ایجاد inbound
+            add_endpoints = [
+                "/api/inbounds/add",
+                "/inbounds/add",
+                "/api/inbound/add", 
+                "/inbound/add",
+                "/panel/api/inbounds/add",
+                "/panel/inbounds/add"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success'):
-                    return data.get('obj', {}).get('id')
+            for endpoint in add_endpoints:
+                try:
+                    response = self.session.post(
+                        f"{self.base_url}{endpoint}",
+                        json=inbound_data,
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('success'):
+                            return data.get('obj', {}).get('id')
+                except Exception:
+                    continue
+            
             return None
             
         except Exception as e:
@@ -191,15 +221,30 @@ class XUIService:
                 }
             }
             
-            response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/updateClient",
-                json=payload,
-                timeout=10
-            )
+            # تست endpoint های مختلف برای ایجاد کاربر
+            update_endpoints = [
+                "/api/inbounds/updateClient",
+                "/inbounds/updateClient",
+                "/api/inbound/updateClient",
+                "/inbound/updateClient",
+                "/panel/api/inbounds/updateClient",
+                "/panel/inbounds/updateClient"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('success', False)
+            for endpoint in update_endpoints:
+                try:
+                    response = self.session.post(
+                        f"{self.base_url}{endpoint}",
+                        json=payload,
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data.get('success', False)
+                except Exception:
+                    continue
+            
             return False
             
         except Exception as e:
@@ -216,15 +261,30 @@ class XUIService:
                 }
             }
             
-            response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/updateClient",
-                json=payload,
-                timeout=10
-            )
+            # تست endpoint های مختلف برای حذف کاربر
+            update_endpoints = [
+                "/api/inbounds/updateClient",
+                "/inbounds/updateClient",
+                "/api/inbound/updateClient",
+                "/inbound/updateClient",
+                "/panel/api/inbounds/updateClient",
+                "/panel/inbounds/updateClient"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('success', False)
+            for endpoint in update_endpoints:
+                try:
+                    response = self.session.post(
+                        f"{self.base_url}{endpoint}",
+                        json=payload,
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data.get('success', False)
+                except Exception:
+                    continue
+            
             return False
             
         except Exception as e:
@@ -244,15 +304,30 @@ class XUIService:
                 }
             }
             
-            response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/updateClient",
-                json=payload,
-                timeout=10
-            )
+            # تست endpoint های مختلف برای به‌روزرسانی کاربر
+            update_endpoints = [
+                "/api/inbounds/updateClient",
+                "/inbounds/updateClient",
+                "/api/inbound/updateClient",
+                "/inbound/updateClient",
+                "/panel/api/inbounds/updateClient",
+                "/panel/inbounds/updateClient"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('success', False)
+            for endpoint in update_endpoints:
+                try:
+                    response = self.session.post(
+                        f"{self.base_url}{endpoint}",
+                        json=payload,
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return data.get('success', False)
+                except Exception:
+                    continue
+            
             return False
             
         except Exception as e:
