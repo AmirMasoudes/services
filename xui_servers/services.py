@@ -369,6 +369,11 @@ class XUIService:
             print(f"خطا در به‌روزرسانی حجم داده: {e}")
             return False
 
+    def _get_api_url(self, endpoint):
+        """دریافت URL کامل API"""
+        # استفاده از مسیر صحیح /panel/ به جای /api/
+        return f"{self.base_url}panel/{endpoint}"
+
 class ConfigGenerator:
     """تولیدکننده کانفیگ‌های مختلف"""
     
