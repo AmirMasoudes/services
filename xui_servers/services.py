@@ -60,8 +60,8 @@ class XUIService:
             print(f"خطا در دریافت inbound ها: {e}")
             return []
     
-    def create_auto_inbound(self, protocol: str = "vless", port: int | None = None) -> int | None:
-        """ایجاد خودکار inbound با تنظیمات پیش‌فرض"""
+    def create_user_specific_inbound(self, user_id: int, protocol: str = "vless", port: int | None = None) -> int | None:
+        """ایجاد inbound جداگانه برای هر کاربر"""
         try:
             if not self.login():
                 return None
@@ -100,13 +100,8 @@ class XUIService:
                 settings["vnext"][0]["address"] = self.server.host
                 settings["vnext"][0]["port"] = port
             
-            # نام inbound از تنظیمات
-            inbound_name = xui_settings.INBOUND_NAMING["format"].format(
-                prefix=xui_settings.INBOUND_NAMING["prefix"],
-                separator=xui_settings.INBOUND_NAMING["separator"],
-                protocol=protocol.upper(),
-                port=port
-            )
+            # نام inbound مخصوص کاربر
+            inbound_name = f"User-{user_id}-{protocol.upper()}-{port}"
             
             inbound_data = {
                 **xui_settings.INBOUND_SETTINGS,
@@ -130,11 +125,40 @@ class XUIService:
             return None
             
         except Exception as e:
-            print(f"خطا در ایجاد inbound: {e}")
+            print(f"خطا در ایجاد inbound کاربر: {e}")
             return None
     
+    def get_or_create_inbound_for_user(self, user_id: int, protocol: str = "vless"):
+        """دریافت یا ایجاد inbound جداگانه برای هر کاربر"""
+        try:
+            # ابتدا inbound های موجود را بررسی کن
+            inbounds = self.get_inbounds()
+            
+            # inbound مخصوص کاربر را پیدا کن
+            user_inbound = None
+            for inbound in inbounds:
+                if (inbound.get('remark', '').startswith(f"User-{user_id}-") and 
+                    inbound.get('protocol') == protocol):
+                    user_inbound = inbound
+                    break
+            
+            if user_inbound:
+                # از inbound موجود کاربر استفاده کن
+                return user_inbound.get('id')
+            else:
+                # inbound جدید برای کاربر ایجاد کن
+                return self.create_user_specific_inbound(user_id, protocol)
+                
+        except Exception as e:
+            print(f"خطا در دریافت/ایجاد inbound کاربر: {e}")
+            return None
+    
+    def create_auto_inbound(self, protocol: str = "vless", port: int | None = None) -> int | None:
+        """ایجاد خودکار inbound با تنظیمات پیش‌فرض (برای سازگاری)"""
+        return self.create_user_specific_inbound(0, protocol, port)
+    
     def get_or_create_inbound(self, protocol: str = "vless"):
-        """دریافت یا ایجاد inbound خودکار"""
+        """دریافت یا ایجاد inbound خودکار (برای سازگاری)"""
         try:
             # ابتدا inbound های موجود را بررسی کن
             inbounds = self.get_inbounds()
@@ -294,8 +318,8 @@ class UserConfigService:
             if not xui_service.login():
                 return None, xui_settings.ERROR_MESSAGES["xui_login_failed"]
             
-            # دریافت یا ایجاد inbound خودکار
-            inbound_id = xui_service.get_or_create_inbound(protocol)
+            # دریافت یا ایجاد inbound جداگانه برای کاربر
+            inbound_id = xui_service.get_or_create_inbound_for_user(user.id, protocol)
             if not inbound_id:
                 return None, xui_settings.ERROR_MESSAGES["inbound_creation_failed"]
             
@@ -378,8 +402,8 @@ class UserConfigService:
             if not xui_service.login():
                 return None, xui_settings.ERROR_MESSAGES["xui_login_failed"]
             
-            # دریافت یا ایجاد inbound خودکار
-            inbound_id = xui_service.get_or_create_inbound(protocol)
+            # دریافت یا ایجاد inbound جداگانه برای کاربر
+            inbound_id = xui_service.get_or_create_inbound_for_user(user.id, protocol)
             if not inbound_id:
                 return None, xui_settings.ERROR_MESSAGES["inbound_creation_failed"]
             
