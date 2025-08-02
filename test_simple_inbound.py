@@ -1,170 +1,159 @@
 #!/usr/bin/env python3
-import os
-import sys
-import django
+"""
+تست ایجاد inbound ساده با فرمت صحیح
+"""
+
 import requests
 import json
-import random
-import string
-
-# تنظیم Django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
-
-from xui_servers.models import XUIServer
-from xui_servers.services import XUIService
-from xui_servers import settings as xui_settings
 
 def test_simple_inbound():
-    """تست ساده ایجاد inbound"""
-    print("🔧 تست ساده ایجاد inbound...")
+    """تست ایجاد inbound ساده"""
     
-    # دریافت سرور X-UI
-    server = XUIServer.objects.filter(is_active=True).first()
-    if not server:
-        print("❌ سرور X-UI فعالی یافت نشد")
-        return
-    
-    print(f"🖥️ سرور: {server.name}")
-    print(f" آدرس: {server.host}:{server.port}")
+    # تنظیمات سرور
+    base_url = "http://38.54.105.124:54321/MsxZ4xuIy5xLfQtsSC"
     
     # ایجاد session
     session = requests.Session()
     session.headers.update({
         'Content-Type': 'application/json',
-        'User-Agent': 'Django-XUI-Bot/1.0'
+        'User-Agent': 'Django-XUI-Bot/2.0'
     })
     
-    # ورود به X-UI
+    print("🔍 تست ایجاد inbound ساده...")
+    print(f"🌐 URL پایه: {base_url}")
+    
+    # تست ورود
+    print("\n🔐 تست ورود...")
     login_data = {
-        "username": server.username,
-        "password": server.password
+        "username": "admin",
+        "password": "YourSecurePassword123!@#"
     }
     
     try:
-        print("🔐 در حال ورود به X-UI...")
-        response = session.post(
-            f"http://{server.host}:{server.port}/login",
-            json=login_data,
-            timeout=10
-        )
-        
-        print(f" کد پاسخ: {response.status_code}")
+        response = session.post(f"{base_url}/login", json=login_data, timeout=10)
+        print(f"📊 وضعیت ورود: {response.status_code}")
         
         if response.status_code == 200:
             data = response.json()
+            print(f"📄 پاسخ ورود: {json.dumps(data, indent=2)}")
+            
             if data.get('success'):
-                print("✅ ورود به X-UI موفق")
-                session.cookies.update(response.cookies)
+                print("✅ ورود موفق")
+                
+                # تست ایجاد inbound ساده
+                print("\n🔧 تست ایجاد inbound ساده...")
+                
+                # فرمت صحیح برای VMess
+                simple_inbound = {
+                    "remark": "Simple-Test-VMess",
+                    "port": 8446,
+                    "protocol": "vmess",
+                    "settings": json.dumps({
+                        "clients": []
+                    }),
+                    "streamSettings": json.dumps({
+                        "network": "tcp",
+                        "security": "none"
+                    }),
+                    "sniffing": "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}",
+                    "enable": True,
+                    "expiryTime": 0,
+                    "listen": "",
+                    "up": [],
+                    "down": [],
+                    "total": 0
+                }
+                
+                print(f"📤 داده ارسالی: {json.dumps(simple_inbound, indent=2)}")
+                
+                # تست endpoint اصلی
+                try:
+                    response = session.post(f"{base_url}/panel/api/inbounds/add", json=simple_inbound, timeout=10)
+                    
+                    print(f"📊 وضعیت پاسخ: {response.status_code}")
+                    print(f"📄 محتوای پاسخ: {response.text}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            print(f"✅ پاسخ JSON: {json.dumps(data, indent=2)}")
+                            
+                            if data.get('success'):
+                                print("✅ Inbound با موفقیت ایجاد شد!")
+                            else:
+                                print(f"❌ خطا: {data.get('msg', 'خطای نامشخص')}")
+                        except json.JSONDecodeError:
+                            print("❌ پاسخ JSON نامعتبر")
+                    else:
+                        print("❌ خطا در ایجاد inbound")
+                        
+                except Exception as e:
+                    print(f"❌ خطا در ارسال درخواست: {e}")
+                
+                # تست ایجاد inbound VLess
+                print("\n🔧 تست ایجاد inbound VLess...")
+                
+                vless_inbound = {
+                    "remark": "Simple-Test-VLess",
+                    "port": 8447,
+                    "protocol": "vless",
+                    "settings": json.dumps({
+                        "clients": []
+                    }),
+                    "streamSettings": json.dumps({
+                        "network": "tcp",
+                        "security": "reality",
+                        "realitySettings": {
+                            "show": False,
+                            "dest": "www.aparat.com:443",
+                            "xver": 0,
+                            "serverNames": ["www.aparat.com"],
+                            "privateKey": "YFgo8YQUJmqhu2yXL8rd8D9gDgJ1H1XgfbYqMB6LmoM",
+                            "shortIds": [""]
+                        }
+                    }),
+                    "sniffing": "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}",
+                    "enable": True,
+                    "expiryTime": 0,
+                    "listen": "",
+                    "up": [],
+                    "down": [],
+                    "total": 0
+                }
+                
+                print(f"📤 داده ارسالی VLess: {json.dumps(vless_inbound, indent=2)}")
+                
+                try:
+                    response = session.post(f"{base_url}/panel/api/inbounds/add", json=vless_inbound, timeout=10)
+                    
+                    print(f"📊 وضعیت پاسخ VLess: {response.status_code}")
+                    print(f"📄 محتوای پاسخ VLess: {response.text}")
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            print(f"✅ پاسخ JSON VLess: {json.dumps(data, indent=2)}")
+                            
+                            if data.get('success'):
+                                print("✅ Inbound VLess با موفقیت ایجاد شد!")
+                            else:
+                                print(f"❌ خطا VLess: {data.get('msg', 'خطای نامشخص')}")
+                        except json.JSONDecodeError:
+                            print("❌ پاسخ JSON نامعتبر VLess")
+                    else:
+                        print("❌ خطا در ایجاد inbound VLess")
+                        
+                except Exception as e:
+                    print(f"❌ خطا در ارسال درخواست VLess: {e}")
+                    
             else:
-                print("❌ خطا در ورود به X-UI")
-                return
+                print("❌ خطا در ورود")
         else:
-            print(f"❌ خطا در اتصال: {response.status_code}")
-            return
+            print(f"❌ خطای HTTP: {response.status_code}")
+            print(f"📄 محتوای پاسخ: {response.text}")
             
     except Exception as e:
-        print(f"❌ خطا در ورود: {e}")
-        return
-    
-    # ایجاد داده inbound ساده
-    port = random.randint(10000, 65000)
-    fake_domain = random.choice(xui_settings.FAKE_DOMAINS)
-    public_key = random.choice(xui_settings.REALITY_PUBLIC_KEYS)
-    short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
-    
-    inbound_data = {
-        "up": [],
-        "down": [],
-        "total": 0,
-        "remark": f"Test-Inbound-{port}",
-        "enable": True,
-        "expiryTime": 0,
-        "listen": "",
-        "port": port,
-        "protocol": "vless",
-        "settings": {
-            "clients": [],
-            "decryption": "none",
-            "fallbacks": []
-        },
-        "streamSettings": {
-            "network": "tcp",
-            "security": "reality",
-            "realitySettings": {
-                "show": False,
-                "dest": "www.aparat.com:443",
-                "xver": 0,
-                "serverNames": [fake_domain],
-                "privateKey": "YFgo8YQUJmqhu2yXL8rd8D9gDgJ1H1XgfbYqMB6LmoM",
-                "shortIds": [short_id]
-            },
-            "tcpSettings": {
-                "header": {
-                    "type": "none"
-                }
-            }
-        },
-        "sniffing": {
-            "enabled": True,
-            "destOverride": ["http", "tls"]
-        }
-    }
-    
-    print(f"\n📊 داده inbound:")
-    print(f"  - پورت: {port}")
-    print(f"  - دامنه: {fake_domain}")
-    print(f"  - کلید عمومی: {public_key[:20]}...")
-    print(f"  - Short ID: {short_id}")
-    
-    # تست endpoint های مختلف برای ایجاد inbound
-    print("\n📊 تست endpoint های ایجاد inbound...")
-    
-    add_endpoints = [
-        "/api/inbounds/add",
-        "/inbounds/add",
-        "/api/inbound/add", 
-        "/inbound/add",
-        "/panel/api/inbounds/add",
-        "/panel/inbounds/add"
-    ]
-    
-    working_endpoint = None
-    for endpoint in add_endpoints:
-        try:
-            print(f"\n🔧 تست {endpoint}...")
-            response = session.post(
-                f"http://{server.host}:{server.port}{endpoint}",
-                json=inbound_data,
-                timeout=10
-            )
-            
-            print(f" کد پاسخ: {response.status_code}")
-            print(f"📋 محتوای پاسخ: {response.text[:200]}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success'):
-                    print(f"✅ Endpoint صحیح برای ایجاد: {endpoint}")
-                    working_endpoint = endpoint
-                    inbound_id = data.get('obj', {}).get('id')
-                    print(f"✅ Inbound ایجاد شد (ID: {inbound_id})")
-                    break
-                else:
-                    print(f"❌ خطا در ایجاد: {data.get('msg', 'خطای نامشخص')}")
-            else:
-                print(f"❌ خطا در اتصال: {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ خطا در {endpoint}: {e}")
-    
-    if working_endpoint:
-        print(f"\n🎯 Endpoint صحیح برای ایجاد: {working_endpoint}")
-        print(f"✅ Inbound با موفقیت ایجاد شد!")
-    else:
-        print("\n❌ هیچ endpoint صحیحی برای ایجاد پیدا نشد")
-    
-    print("\n🎉 تست ساده کامل شد!")
+        print(f"❌ خطا در اتصال: {e}")
 
 if __name__ == "__main__":
     test_simple_inbound() 

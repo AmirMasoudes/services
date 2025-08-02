@@ -125,13 +125,20 @@ class XUIService:
             # نام inbound مخصوص کاربر
             inbound_name = f"User-{user_id}-{protocol.upper()}-{port}"
             
+            # فرمت صحیح برای X-UI فعلی
             inbound_data = {
-                **xui_settings.INBOUND_SETTINGS,
                 "remark": inbound_name,
                 "port": port,
                 "protocol": protocol,
-                "settings": settings,
-                "streamSettings": stream_settings
+                "settings": json.dumps(settings),  # تبدیل به JSON string
+                "streamSettings": json.dumps(stream_settings),  # تبدیل به JSON string
+                "sniffing": xui_settings.INBOUND_SETTINGS["sniffing"],  # استفاده از فرمت صحیح
+                "enable": True,
+                "expiryTime": 0,
+                "listen": "",
+                "up": [],
+                "down": [],
+                "total": 0
             }
             
             print(f"📤 ارسال درخواست ایجاد inbound: {inbound_name}")
@@ -159,15 +166,18 @@ class XUIService:
                     print(f"📊 وضعیت پاسخ: {response.status_code}")
                     
                     if response.status_code == 200:
-                        data = response.json()
-                        print(f"📄 پاسخ JSON: {json.dumps(data, indent=2)}")
-                        
-                        if data.get('success'):
-                            inbound_id = data.get('obj', {}).get('id')
-                            print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
-                            return inbound_id
-                        else:
-                            print(f"❌ خطا در پاسخ: {data.get('msg', 'خطای نامشخص')}")
+                        try:
+                            data = response.json()
+                            print(f"📄 پاسخ JSON: {json.dumps(data, indent=2)}")
+                            
+                            if data.get('success'):
+                                inbound_id = data.get('obj', {}).get('id')
+                                print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
+                                return inbound_id
+                            else:
+                                print(f"❌ خطا در پاسخ: {data.get('msg', 'خطای نامشخص')}")
+                        except json.JSONDecodeError:
+                            print(f"❌ پاسخ JSON نامعتبر: {response.text}")
                     else:
                         print(f"❌ خطای HTTP: {response.status_code}")
                         print(f"📄 محتوای پاسخ: {response.text}")

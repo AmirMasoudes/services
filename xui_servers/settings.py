@@ -173,16 +173,9 @@ PROTOCOL_SETTINGS = {
     }
 }
 
-# تنظیمات پیش‌فرض برای inbound ها
+# تنظیمات پیش‌فرض برای inbound ها - اصلاح شده برای X-UI فعلی
 INBOUND_SETTINGS = {
-    "sniffing": {
-        "enabled": True,
-        "destOverride": [
-            "http",
-            "tls",
-            "quic"
-        ]
-    },
+    "sniffing": "{\"enabled\":true,\"destOverride\":[\"http\",\"tls\"]}",
     "enable": True,
     "expiryTime": 0,
     "listen": "",
