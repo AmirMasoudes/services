@@ -8,8 +8,14 @@ import json
 import sys
 import os
 
+# تنظیم Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
 # اضافه کردن مسیر پروژه
 sys.path.append('/opt/vpn-service/services')
+
+import django
+django.setup()
 
 from xui_servers.models import XUIServer
 from xui_servers.services import XUIService
