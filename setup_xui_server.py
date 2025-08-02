@@ -1,152 +1,181 @@
 #!/usr/bin/env python3
 """
-اسکریپت راه‌اندازی سرور X-UI
+اسکریپت تنظیم سرور X-UI در Django
 """
 
 import os
 import sys
 import django
-from dotenv import load_dotenv
 
-# اضافه کردن مسیر پروژه به sys.path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# اضافه کردن مسیر پروژه
+sys.path.append('/opt/configvpn')
 
-# Load environment variables
-load_dotenv()
-
-# تنظیم ماژول تنظیمات
+# تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-
-# راه‌اندازی جنگو
 django.setup()
 
 from xui_servers.models import XUIServer
 from xui_servers.services import XUIService
 
 def setup_xui_server():
-    """راه‌اندازی سرور X-UI"""
-    print("🚀 راه‌اندازی سرور X-UI...")
+    """تنظیم سرور X-UI در Django"""
+    print("🔧 تنظیم سرور X-UI...")
     
-    # بررسی سرورهای موجود
-    existing_servers = XUIServer.objects.filter(is_active=True)
-    if existing_servers.exists():
-        print("📊 سرورهای موجود:")
-        for server in existing_servers:
-            print(f"  - {server.name} ({server.host}:{server.port})")
+    # تنظیمات سرور فعلی
+    server_config = {
+        "name": "سرور اصلی",
+        "host": "38.54.105.124",
+        "port": 54321,
+        "username": "admin",
+        "password": "YourSecurePassword123!@#",
+        "web_base_path": "/MsxZ4xuIy5xLfQtsSC/",
+        "is_active": True
+    }
+    
+    # ایجاد یا به‌روزرسانی سرور
+    server, created = XUIServer.objects.get_or_create(
+        host=server_config["host"],
+        defaults=server_config
+    )
+    
+    if created:
+        print(f"✅ سرور جدید ایجاد شد: {server}")
+    else:
+        # به‌روزرسانی تنظیمات موجود
+        for key, value in server_config.items():
+            setattr(server, key, value)
+        server.save()
+        print(f"📝 سرور موجود به‌روزرسانی شد: {server}")
+    
+    print(f"🌐 URL کامل: {server.get_full_url()}")
+    
+    # تست اتصال
+    print("🔐 تست اتصال به X-UI...")
+    xui_service = XUIService(server)
+    
+    if xui_service.login():
+        print("✅ اتصال به X-UI موفقیت‌آمیز بود!")
+        
+        # دریافت inbound ها
+        inbounds = xui_service.get_inbounds()
+        print(f"📋 تعداد inbound موجود: {len(inbounds)}")
+        
+        return server
+    else:
+        print("❌ خطا در اتصال به X-UI")
+        print("🔍 لطفا تنظیمات زیر را بررسی کنید:")
+        print(f"  - آدرس: {server.host}:{server.port}")
+        print(f"  - مسیر وب: {server.web_base_path}")
+        print(f"  - نام کاربری: {server.username}")
+        print(f"  - رمز عبور: {server.password}")
+        return None
+
+def create_default_inbounds(server):
+    """ایجاد inbound های پیش‌فرض"""
+    print("\n🔧 ایجاد inbound های پیش‌فرض...")
+    
+    xui_service = XUIService(server)
+    if not xui_service.login():
+        print("❌ خطا در ورود به X-UI")
         return
     
-    # ایجاد سرور پیش‌فرض
-    try:
-        server = XUIServer.objects.create(
-            name="سرور اصلی",
-            host="your-server-ip.com",  # آدرس سرور خود را اینجا قرار دهید
-            port=54321,  # پورت X-UI
-            username="admin",  # نام کاربری X-UI
-            password="your-password",  # رمز عبور X-UI
-            is_active=True
-        )
+    # دریافت inbound های موجود
+    existing_inbounds = xui_service.get_inbounds()
+    existing_remarks = [inbound.get('remark', '') for inbound in existing_inbounds]
+    
+    # تنظیمات inbound های پیش‌فرض
+    default_inbounds = [
+        {
+            "name": "VLess-Reality-Main",
+            "protocol": "vless",
+            "port": 443,
+            "description": "Inbound اصلی برای VLess Reality"
+        },
+        {
+            "name": "VMess-Main", 
+            "protocol": "vmess",
+            "port": 8443,
+            "description": "Inbound برای VMess"
+        },
+        {
+            "name": "Trojan-Main",
+            "protocol": "trojan", 
+            "port": 9443,
+            "description": "Inbound برای Trojan"
+        }
+    ]
+    
+    created_count = 0
+    for inbound_config in default_inbounds:
+        remark = inbound_config["name"]
         
-        print(f"✅ سرور X-UI ایجاد شد: {server.name}")
-        print(f"🖥️ آدرس: {server.host}:{server.port}")
-        print(f"👤 نام کاربری: {server.username}")
-        
-        # تست اتصال
-        print("\n🔍 تست اتصال به سرور...")
-        xui_service = XUIService(server)
-        
-        if xui_service.login():
-            print("✅ اتصال به سرور موفق بود!")
+        if remark not in existing_remarks:
+            print(f"➕ ایجاد inbound: {remark}")
             
-            # دریافت inbound ها
-            inbounds = xui_service.get_inbounds()
-            if inbounds:
-                print(f"📋 تعداد inbound ها: {len(inbounds)}")
-                for inbound in inbounds:
-                    print(f"  - ID: {inbound.get('id')}, Port: {inbound.get('port')}")
+            # ایجاد inbound
+            inbound_id = xui_service.create_auto_inbound(
+                protocol=inbound_config["protocol"],
+                port=inbound_config["port"]
+            )
+            
+            if inbound_id:
+                print(f"  ✅ ایجاد شد - ID: {inbound_id}")
+                created_count += 1
             else:
-                print("⚠️ هیچ inbound یافت نشد. لطفا در X-UI inbound ایجاد کنید.")
+                print(f"  ❌ خطا در ایجاد")
         else:
-            print("❌ خطا در اتصال به سرور. لطفا تنظیمات را بررسی کنید.")
-            
-    except Exception as e:
-        print(f"❌ خطا در ایجاد سرور: {e}")
-
-def test_xui_connection():
-    """تست اتصال به سرورهای X-UI"""
-    print("\n🔍 تست اتصال به سرورهای X-UI...")
+            print(f"📋 inbound موجود: {remark}")
     
-    servers = XUIServer.objects.filter(is_active=True)
-    if not servers.exists():
-        print("❌ هیچ سرور فعالی یافت نشد.")
+    print(f"\n📊 خلاصه: {created_count} inbound جدید ایجاد شد")
+
+def test_user_creation(server):
+    """تست ایجاد کاربر"""
+    print("\n👤 تست ایجاد کاربر...")
+    
+    xui_service = XUIService(server)
+    if not xui_service.login():
+        print("❌ خطا در ورود به X-UI")
         return
     
-    for server in servers:
-        print(f"\n🖥️ تست سرور: {server.name}")
-        print(f"📍 آدرس: {server.host}:{server.port}")
+    # تست ایجاد inbound برای کاربر
+    test_user_id = 12345
+    inbound_id = xui_service.get_or_create_inbound_for_user(test_user_id, "vless")
+    
+    if inbound_id:
+        print(f"✅ Inbound برای کاربر ایجاد شد - ID: {inbound_id}")
         
-        try:
-            xui_service = XUIService(server)
-            
-            # تست ورود
-            if xui_service.login():
-                print("✅ ورود موفق")
-                
-                # دریافت inbound ها
-                inbounds = xui_service.get_inbounds()
-                if inbounds:
-                    print(f"📋 تعداد inbound ها: {len(inbounds)}")
-                    for inbound in inbounds[:3]:  # نمایش 3 مورد اول
-                        print(f"  - ID: {inbound.get('id')}, Port: {inbound.get('port')}")
-                else:
-                    print("⚠️ هیچ inbound یافت نشد")
-            else:
-                print("❌ خطا در ورود")
-                
-        except Exception as e:
-            print(f"❌ خطا در اتصال: {e}")
+        # تست ایجاد کاربر در inbound
+        user_data = {
+            "id": "test-user-123",
+            "email": "test@vpn.com",
+            "totalGB": 10,
+            "expiryTime": 0
+        }
+        
+        if xui_service.create_user(inbound_id, user_data):
+            print("✅ کاربر با موفقیت ایجاد شد")
+        else:
+            print("❌ خطا در ایجاد کاربر")
+    else:
+        print("❌ خطا در ایجاد inbound")
 
-def show_help():
-    """نمایش راهنما"""
-    print("""
-🔧 راهنمای راه‌اندازی X-UI:
-
-1. ابتدا X-UI را روی سرور خود نصب کنید:
-   https://github.com/vaxilu/x-ui
-
-2. تنظیمات سرور را در فایل .env قرار دهید:
-   XUI_SERVER_HOST=your-server-ip.com
-   XUI_SERVER_PORT=54321
-   XUI_USERNAME=admin
-   XUI_PASSWORD=your-password
-
-3. این اسکریپت را اجرا کنید:
-   python setup_xui_server.py
-
-4. در X-UI یک inbound ایجاد کنید (VMess/VLess)
-
-5. ربات را اجرا کنید:
-   python bot/user_bot.py
-
-📋 نکات مهم:
-• حتماً inbound در X-UI ایجاد کنید
-• پورت 443 برای HTTPS ضروری است
-• SSL certificate باید معتبر باشد
-• فایروال سرور را باز کنید
-""")
+def main():
+    """تابع اصلی"""
+    print("🚀 شروع تنظیم سرور X-UI")
+    print("=" * 50)
+    
+    # تنظیم سرور
+    server = setup_xui_server()
+    
+    if server:
+        # ایجاد inbound های پیش‌فرض
+        create_default_inbounds(server)
+        
+        # تست ایجاد کاربر
+        test_user_creation(server)
+    
+    print("\n" + "=" * 50)
+    print("🏁 تنظیمات کامل شد")
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("🔧 راه‌اندازی سیستم X-UI")
-    print("=" * 50)
-    
-    if len(sys.argv) > 1 and sys.argv[1] == "help":
-        show_help()
-    else:
-        setup_xui_server()
-        test_xui_connection()
-        
-        print("\n" + "=" * 50)
-        print("✅ راه‌اندازی کامل شد!")
-        print("🤖 حالا می‌توانید ربات را اجرا کنید:")
-        print("python bot/user_bot.py")
-        print("=" * 50) 
+    main() 

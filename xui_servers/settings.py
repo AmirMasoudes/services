@@ -179,7 +179,8 @@ INBOUND_SETTINGS = {
         "enabled": True,
         "destOverride": [
             "http",
-            "tls"
+            "tls",
+            "quic"
         ]
     },
     "enable": True,
@@ -187,14 +188,18 @@ INBOUND_SETTINGS = {
     "listen": "",
     "up": [],
     "down": [],
-    "total": 0
+    "total": 0,
+    "remark": "AutoBot-Inbound"
 }
 
 # تنظیمات پیش‌فرض برای کاربران
 USER_DEFAULT_SETTINGS = {
-    "limitIp": 1,
-    "totalGB": 0,  # برای تست نامحدود
-    "expiryTime": 0  # زمان انقضا بر حسب میلی‌ثانیه
+    "limitIp": 3,
+    "totalGB": 0,
+    "expiryTime": 0,
+    "enable": True,
+    "tgId": "",
+    "subId": ""
 }
 
 # تنظیمات کانفیگ‌های تولید شده
@@ -223,21 +228,26 @@ CONFIG_SETTINGS = {
 
 # تنظیمات نام‌گذاری inbound ها
 INBOUND_NAMING = {
-    "prefix": "AutoBot",
+    "prefix": "UserBot",
     "separator": "-",
-    "format": "{prefix}{separator}{protocol}{separator}{port}"
+    "format": "{prefix}{separator}{user_id}{separator}{protocol}{separator}{port}",
+    "trial_prefix": "TrialBot",
+    "paid_prefix": "PaidBot"
 }
 
 # تنظیمات ایمیل کاربران
 EMAIL_SETTINGS = {
-    "trial_format": "trial_{telegram_id}@vpn.com",
-    "paid_format": "paid_{telegram_id}_{plan_id}@vpn.com"
+    "trial_format": "trial_{telegram_id}_{timestamp}@vpn.com",
+    "paid_format": "paid_{telegram_id}_{plan_id}_{timestamp}@vpn.com",
+    "timestamp_format": "%Y%m%d%H%M%S"
 }
 
-# تنظیمات زمان انقضا (30 روز برای پلن‌های پولی)
+# تنظیمات زمان انقضا
 EXPIRY_SETTINGS = {
     "trial_hours": 24,
-    "paid_days": 30
+    "paid_days": 30,
+    "extend_hours": 24,
+    "grace_period_hours": 2
 }
 
 # تنظیمات حجم داده (تبدیل MB به GB)
@@ -245,7 +255,7 @@ TRAFFIC_SETTINGS = {
     "mb_to_gb_conversion": 1024
 }
 
-# تنظیمات پورت‌ها (پورت‌های مختلف برای هر کاربر)
+# تنظیمات پورت‌ها - به‌روزرسانی شده برای سرور فعلی
 PORT_SETTINGS = {
     "min_port": 10000,
     "max_port": 65000,
@@ -253,48 +263,64 @@ PORT_SETTINGS = {
         "vmess": 443,
         "vless": 443,
         "trojan": 443
-    }
+    },
+    "reserved_ports": [54321, 80, 443],  # پورت فعلی X-UI اضافه شد
+    "port_check_timeout": 5
 }
 
 # تنظیمات امنیت
 SECURITY_SETTINGS = {
     "enable_sniffing": True,
-    "dest_override": ["http", "tls"],
-    "tls_enabled": True
+    "dest_override": ["http", "tls", "quic"],
+    "tls_enabled": True,
+    "reality_enabled": True,
+    "enable_proxy_protocol": False,
+    "enable_udp": True
 }
 
 # تنظیمات لاگ
 LOGGING_SETTINGS = {
     "enable_logging": True,
     "log_level": "INFO",
-    "log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    "log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "log_file": "/opt/configvpn/logs/xui_service.log",
+    "max_log_size": "10MB",
+    "backup_count": 5
 }
 
-# تنظیمات اتصال به X-UI
+# تنظیمات اتصال به X-UI - برای سرور فعلی
 XUI_CONNECTION_SETTINGS = {
-    "timeout": 10,
-    "retry_attempts": 3,
-    "retry_delay": 1
+    "timeout": 15,
+    "retry_attempts": 5,
+    "retry_delay": 2,
+    "verify_ssl": False,  # چون SSL فعال نیست
+    "user_agent": "Django-XUI-Bot/2.0"
 }
 
-# تنظیمات نام‌های کانفیگ (با نام کاربر)
+# تنظیمات نام‌های کانفیگ
 CONFIG_NAMING = {
-    "trial_format": "پلن تستی {user_name} ({protocol})",
-    "paid_format": "{plan_name} {user_name} ({protocol})"
+    "trial_format": "پلن تستی {user_name} ({protocol}) - {expiry}",
+    "paid_format": "{plan_name} {user_name} ({protocol}) - {expiry}",
+    "expiry_format": "%Y/%m/%d"
 }
 
 # تنظیمات پیام‌های موفقیت
 SUCCESS_MESSAGES = {
-    "trial_created": "کانفیگ تستی {protocol} با موفقیت ایجاد شد",
-    "paid_created": "کانفیگ پولی {protocol} با موفقیت ایجاد شد",
-    "config_deleted": "کانفیگ با موفقیت حذف شد"
+    "trial_created": "کانفیگ تستی {protocol} با موفقیت ایجاد شد\n⏰ مدت: {duration} ساعت\n📊 حجم: نامحدود",
+    "paid_created": "کانفیگ پولی {protocol} با موفقیت ایجاد شد\n⏰ مدت: {duration} روز\n📊 حجم: {traffic}GB",
+    "config_deleted": "کانفیگ با موفقیت حذف شد",
+    "config_extended": "کانفیگ با موفقیت تمدید شد",
+    "traffic_updated": "حجم داده با موفقیت به‌روزرسانی شد"
 }
 
 # تنظیمات پیام‌های خطا
 ERROR_MESSAGES = {
-    "xui_login_failed": "خطا در ورود به X-UI",
-    "inbound_creation_failed": "خطا در ایجاد inbound خودکار",
-    "user_creation_failed": "خطا در ایجاد کاربر در X-UI",
-    "invalid_protocol": "پروتکل نامعتبر",
-    "xui_deletion_failed": "خطا در حذف از X-UI"
+    "xui_login_failed": "خطا در ورود به X-UI - لطفا تنظیمات سرور را بررسی کنید",
+    "inbound_creation_failed": "خطا در ایجاد inbound خودکار - لطفا پورت‌های آزاد را بررسی کنید",
+    "user_creation_failed": "خطا در ایجاد کاربر در X-UI - لطفا تنظیمات inbound را بررسی کنید",
+    "invalid_protocol": "پروتکل نامعتبر - پروتکل‌های پشتیبانی شده: vless, vmess, trojan",
+    "xui_deletion_failed": "خطا در حذف از X-UI - لطفا دستی حذف کنید",
+    "port_already_in_use": "پورت مورد نظر در حال استفاده است - پورت جدید انتخاب می‌شود",
+    "traffic_limit_exceeded": "محدودیت حجم داده تمام شده",
+    "expiry_time_reached": "زمان کانفیگ منقضی شده"
 } 

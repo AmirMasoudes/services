@@ -12,10 +12,15 @@ class XUIServer(BaseModel, TimeStampMixin, SoftDeleteModel):
     port = models.IntegerField(default=54321, help_text="پورت X-UI")
     username = models.CharField(max_length=100, help_text="نام کاربری X-UI")
     password = models.CharField(max_length=255, help_text="رمز عبور X-UI")
+    web_base_path = models.CharField(max_length=100, default="/MsxZ4xuIy5xLfQtsSC/", help_text="مسیر وب X-UI")
     is_active = models.BooleanField(default=True, help_text="آیا سرور فعال است؟")
     
     def __str__(self):
         return f"{self.name} ({self.host}:{self.port})"
+    
+    def get_full_url(self):
+        """دریافت URL کامل سرور"""
+        return f"http://{self.host}:{self.port}{self.web_base_path}"
 
 class UserConfig(BaseModel, TimeStampMixin, SoftDeleteModel):
     """کانفیگ کاربر در X-UI"""

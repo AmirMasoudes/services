@@ -16,11 +16,16 @@ class XUIService:
     
     def __init__(self, server: XUIServer):
         self.server = server
-        self.base_url = f"http://{server.host}:{server.port}"
+        # به‌روزرسانی base_url برای پشتیبانی از web base path
+        base_url = f"http://{server.host}:{server.port}"
+        if hasattr(server, 'web_base_path') and server.web_base_path:
+            base_url += server.web_base_path
+        self.base_url = base_url.rstrip('/')
+        
         self.session = requests.Session()
         self.session.headers.update({
             'Content-Type': 'application/json',
-            'User-Agent': 'Django-XUI-Bot/1.0'
+            'User-Agent': 'Django-XUI-Bot/2.0'
         })
     
     def login(self):
@@ -34,7 +39,8 @@ class XUIService:
             response = self.session.post(
                 f"{self.base_url}/login",
                 json=login_data,
-                timeout=10
+                timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"],
+                verify=xui_settings.XUI_CONNECTION_SETTINGS.get("verify_ssl", False)
             )
             
             if response.status_code == 200:
@@ -50,7 +56,7 @@ class XUIService:
     def get_inbounds(self):
         """دریافت لیست inbound ها"""
         try:
-            # تست endpoint های مختلف
+            # تست endpoint های مختلف با web base path
             endpoints = [
                 "/api/inbounds/list",
                 "/inbounds/list", 
@@ -62,7 +68,10 @@ class XUIService:
             
             for endpoint in endpoints:
                 try:
-                    response = self.session.get(f"{self.base_url}{endpoint}")
+                    response = self.session.get(
+                        f"{self.base_url}{endpoint}",
+                        timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
+                    )
                     if response.status_code == 200:
                         data = response.json()
                         return data.get('obj', [])
