@@ -59,8 +59,8 @@ def test_simple_inbound():
                     "enable": True,
                     "expiryTime": 0,
                     "listen": "",
-                    "up": [],
-                    "down": [],
+                    "up": 0,  # تغییر از آرایه به عدد
+                    "down": 0,  # تغییر از آرایه به عدد
                     "total": 0
                 }
                 
@@ -116,8 +116,8 @@ def test_simple_inbound():
                     "enable": True,
                     "expiryTime": 0,
                     "listen": "",
-                    "up": [],
-                    "down": [],
+                    "up": 0,  # تغییر از آرایه به عدد
+                    "down": 0,  # تغییر از آرایه به عدد
                     "total": 0
                 }
                 

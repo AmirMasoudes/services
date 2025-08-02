@@ -136,8 +136,8 @@ class XUIService:
                 "enable": True,
                 "expiryTime": 0,
                 "listen": "",
-                "up": [],
-                "down": [],
+                "up": 0,  # تغییر از آرایه به عدد
+                "down": 0,  # تغییر از آرایه به عدد
                 "total": 0
             }
             
