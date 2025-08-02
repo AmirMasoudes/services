@@ -92,9 +92,10 @@ def test_user_config_creation():
     test_user_1, created = UsersModel.objects.get_or_create(
         telegram_id=999001,
         defaults={
+            'id_tel': '999001',
+            'username_tel': 'testuser1',
             'full_name': 'کاربر تست 1',
-            'username': 'testuser1',
-            'phone_number': '09120000001'
+            'username': 'testuser1'
         }
     )
     
@@ -102,9 +103,10 @@ def test_user_config_creation():
     test_user_2, created = UsersModel.objects.get_or_create(
         telegram_id=999002,
         defaults={
+            'id_tel': '999002',
+            'username_tel': 'testuser2',
             'full_name': 'کاربر تست 2',
-            'username': 'testuser2',
-            'phone_number': '09120000002'
+            'username': 'testuser2'
         }
     )
     
