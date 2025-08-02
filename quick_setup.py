@@ -35,7 +35,7 @@ def main():
     # ایجاد دیتابیس و کاربر (بدون sudo)
     print("\n📊 ایجاد دیتابیس PostgreSQL...")
     run_cmd('su - postgres -c "psql -c \\"CREATE DATABASE configvpn_db;\\""', "Create database")
-    run_cmd('su - postgres -c "psql -c \\"CREATE USER configvpn_user WITH PASSWORD \\'YourSecurePassword123!@#';\\""', "Create user")
+    run_cmd("su - postgres -c 'psql -c \"CREATE USER configvpn_user WITH PASSWORD \\\"YourSecurePassword123!@#\\\";\"'", "Create user")
     run_cmd('su - postgres -c "psql -c \\"GRANT ALL PRIVILEGES ON DATABASE configvpn_db TO configvpn_user;\\""', "Grant privileges")
     
     # 3. راه‌اندازی Redis
