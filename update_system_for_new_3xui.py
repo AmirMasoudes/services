@@ -21,8 +21,8 @@ def update_system_for_new_3xui():
         "password": "CoBjH7ncWJ",
         "web_base_path": "CA9xDKTc5kG0hcw7gw"
     }
-    
-    print(f"�� اطلاعات جدید 3X-UI:")
+
+    print(f" اطلاعات جدید 3X-UI:")
     print(f"  - آدرس: {new_config['host']}:{new_config['port']}")
     print(f"  - نام کاربری: {new_config['username']}")
     print(f"  - رمز عبور: {new_config['password']}")
