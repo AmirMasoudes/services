@@ -1107,11 +1107,11 @@ async def back_to_configs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # اجرای ربات
 async def main():
     # توکن را از متغیر محیطی یا فایل تنظیمات بخوانید
-    TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+    TOKEN = os.getenv('USER_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
     
     if TOKEN == 'YOUR_BOT_TOKEN_HERE':
         print("❌ لطفا توکن ربات را در فایل .env تنظیم کنید!")
-        print("مثال: TELEGRAM_BOT_TOKEN=your_bot_token_here")
+        print("مثال: USER_BOT_TOKEN=your_bot_token_here")
         return
 
     app = ApplicationBuilder().token(TOKEN).build()
