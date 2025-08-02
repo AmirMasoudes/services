@@ -88,6 +88,7 @@ class XUIService:
         """ایجاد inbound جداگانه برای هر کاربر"""
         try:
             if not self.login():
+                print("❌ خطا در ورود به X-UI")
                 return None
             
             # اگر پورت مشخص نشده، پورت تصادفی انتخاب کن
@@ -100,6 +101,7 @@ class XUIService:
             # دریافت تنظیمات پروتکل
             protocol_config = xui_settings.PROTOCOL_SETTINGS.get(protocol.lower())
             if not protocol_config:
+                print(f"❌ پروتکل {protocol} پشتیبانی نمی‌شود")
                 return None
             
             # تنظیمات stream و settings از فایل تنظیمات
@@ -132,6 +134,9 @@ class XUIService:
                 "streamSettings": stream_settings
             }
             
+            print(f"📤 ارسال درخواست ایجاد inbound: {inbound_name}")
+            print(f"📊 داده ارسالی: {json.dumps(inbound_data, indent=2)}")
+            
             # تست endpoint های مختلف برای ایجاد inbound
             add_endpoints = [
                 "/api/inbounds/add",
@@ -144,23 +149,38 @@ class XUIService:
             
             for endpoint in add_endpoints:
                 try:
+                    print(f"🔗 تست endpoint: {endpoint}")
                     response = self.session.post(
                         f"{self.base_url}{endpoint}",
                         json=inbound_data,
-                        timeout=10
+                        timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
                     )
+                    
+                    print(f"📊 وضعیت پاسخ: {response.status_code}")
                     
                     if response.status_code == 200:
                         data = response.json()
+                        print(f"📄 پاسخ JSON: {json.dumps(data, indent=2)}")
+                        
                         if data.get('success'):
-                            return data.get('obj', {}).get('id')
-                except Exception:
+                            inbound_id = data.get('obj', {}).get('id')
+                            print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
+                            return inbound_id
+                        else:
+                            print(f"❌ خطا در پاسخ: {data.get('msg', 'خطای نامشخص')}")
+                    else:
+                        print(f"❌ خطای HTTP: {response.status_code}")
+                        print(f"📄 محتوای پاسخ: {response.text}")
+                        
+                except Exception as e:
+                    print(f"❌ خطا در endpoint {endpoint}: {e}")
                     continue
             
+            print("❌ هیچ endpoint کارآمدی یافت نشد")
             return None
             
         except Exception as e:
-            print(f"خطا در ایجاد inbound کاربر: {e}")
+            print(f"❌ خطا در ایجاد inbound کاربر: {e}")
             return None
     
     def get_or_create_inbound_for_user(self, user_id: int, protocol: str = "vless"):
