@@ -2,6 +2,7 @@
 import os
 import sys
 import django
+import uuid
 
 # تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -97,7 +98,7 @@ def test_bot_integration():
     print(f"✅ ConfigGenerator کار می‌کند: {test_config[:50]}...")
     
     print("\n🎉 تست یکپارچگی با بوت‌ها کامل شد!")
-    print("\n�� خلاصه نتایج:")
+    print("\n خلاصه نتایج:")
     print("✅ SimpleConfigService - کار می‌کند")
     print("✅ UserConfigService - کار می‌کند") 
     print("✅ XUIService - کار می‌کند")
