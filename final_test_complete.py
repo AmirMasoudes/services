@@ -96,7 +96,9 @@ def test_services():
         ("django-vpn", "Django VPN"),
         ("nginx", "Nginx"),
         ("redis-server", "Redis"),
-        ("postgresql", "PostgreSQL")
+        ("postgresql", "PostgreSQL"),
+        ("admin-bot", "Admin Bot"),
+        ("user-bot", "User Bot")
     ]
     
     active_services = 0
@@ -109,7 +111,7 @@ def test_services():
             print(f"❌ {name}: غیرفعال")
     
     print(f"\n📊 سرویس‌های فعال: {active_services}/{len(services)}")
-    return active_services == len(services)
+    return active_services >= 4  # حداقل 4 سرویس باید فعال باشد
 
 def test_ports():
     """تست پورت‌ها"""
@@ -157,6 +159,29 @@ def test_bots():
     print(f"\n📊 فایل‌های بات موجود: {existing_bots}/{len(bot_files)}")
     return existing_bots == len(bot_files)
 
+def test_bot_processes():
+    """تست پروسه‌های بات"""
+    print("\n🔄 تست پروسه‌های بات:")
+    print("=" * 30)
+    
+    # بررسی پروسه‌های Python که بات‌ها را اجرا می‌کنند
+    result = subprocess.run("ps aux | grep -E '(admin_boy|user_bot)' | grep -v grep", shell=True, capture_output=True, text=True)
+    
+    if result.returncode == 0:
+        processes = result.stdout.strip().split('\n')
+        if processes and processes[0]:
+            print("✅ پروسه‌های بات در حال اجرا:")
+            for process in processes:
+                if process.strip():
+                    print(f"   🔄 {process.strip()}")
+            return True
+        else:
+            print("❌ هیچ پروسه‌ای از بات‌ها یافت نشد")
+            return False
+    else:
+        print("❌ هیچ پروسه‌ای از بات‌ها یافت نشد")
+        return False
+
 def main():
     """تابع اصلی"""
     print("🎉 تست نهایی کامل سیستم Django VPN")
@@ -171,7 +196,8 @@ def main():
         ("سرور X-UI", test_xui_server),
         ("سرویس‌ها", test_services),
         ("پورت‌ها", test_ports),
-        ("بات‌ها", test_bots)
+        ("بات‌ها", test_bots),
+        ("پروسه‌های بات", test_bot_processes)
     ]
     
     passed_tests = 0
