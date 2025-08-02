@@ -101,7 +101,7 @@ class XUIService:
             if protocol.lower() == "vless":
                 # انتخاب دامنه فیک تصادفی
                 fake_domain = random.choice(xui_settings.FAKE_DOMAINS)
-                stream_settings["realitySettings"]["serverName"] = fake_domain
+                stream_settings["realitySettings"]["serverNames"] = [fake_domain]
                 
                 # انتخاب کلید عمومی تصادفی
                 public_key = random.choice(xui_settings.REALITY_PUBLIC_KEYS)
@@ -109,11 +109,7 @@ class XUIService:
                 
                 # تولید shortId تصادفی
                 short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
-                stream_settings["realitySettings"]["shortId"] = short_id
-                
-                # تنظیم آدرس سرور
-                settings["vnext"][0]["address"] = self.server.host
-                settings["vnext"][0]["port"] = port
+                stream_settings["realitySettings"]["shortIds"] = [short_id]
             
             # نام inbound مخصوص کاربر
             inbound_name = f"User-{user_id}-{protocol.upper()}-{port}"

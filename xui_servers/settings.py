@@ -126,11 +126,11 @@ PROTOCOL_SETTINGS = {
             "security": "reality",
             "realitySettings": {
                 "show": False,
-                "fingerprint": "chrome",
-                "serverName": "",  # تصادفی انتخاب می‌شود
-                "publicKey": "",   # تصادفی انتخاب می‌شود
-                "shortId": "",     # تصادفی تولید می‌شود
-                "spiderX": "/"
+                "dest": "www.aparat.com:443",
+                "xver": 0,
+                "serverNames": ["www.aparat.com"],
+                "privateKey": "YFgo8YQUJmqhu2yXL8rd8D9gDgJ1H1XgfbYqMB6LmoM",
+                "shortIds": [""]
             },
             "tcpSettings": {
                 "header": {
@@ -139,13 +139,9 @@ PROTOCOL_SETTINGS = {
             }
         },
         "settings": {
-            "vnext": [
-                {
-                    "address": "",  # از سرور X-UI گرفته می‌شود
-                    "port": 443,
-                    "users": []
-                }
-            ]
+            "clients": [],
+            "decryption": "none",
+            "fallbacks": []
         }
     },
     "trojan": {
