@@ -77,7 +77,7 @@ def create_simple_user_config():
         user=test_user,
         server=server,
         xui_inbound_id=0,  # فعلاً 0 قرار می‌دهیم
-        xui_user_id=test_user.id,
+        xui_user_id=test_user.telegram_id,  # استفاده از telegram_id به جای UUID
         config_name=config_name,
         config_data=config_data,
         protocol="vless",
@@ -151,7 +151,7 @@ def create_multiple_user_configs():
             user=user,
             server=server,
             xui_inbound_id=i,  # شماره کاربر
-            xui_user_id=user.id,
+            xui_user_id=user.telegram_id,  # استفاده از telegram_id
             config_name=config_name,
             config_data=config_data,
             protocol="vless",

@@ -22,7 +22,7 @@ class UserConfig(BaseModel, TimeStampMixin, SoftDeleteModel):
     user = models.ForeignKey(UsersModel, on_delete=models.CASCADE, related_name="xui_configs")
     server = models.ForeignKey(XUIServer, on_delete=models.CASCADE, related_name="user_configs")
     xui_inbound_id = models.IntegerField(help_text="شناسه inbound در X-UI")
-    xui_user_id = models.IntegerField(help_text="شناسه کاربر در X-UI")
+    xui_user_id = models.CharField(max_length=100, help_text="شناسه کاربر در X-UI")  # تغییر به CharField
     config_name = models.CharField(max_length=100, help_text="نام کانفیگ")
     config_data = models.TextField(help_text="داده‌های کانفیگ (vmess/vless)")
     is_active = models.BooleanField(default=True, help_text="آیا کانفیگ فعال است؟")
