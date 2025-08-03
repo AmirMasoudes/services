@@ -99,8 +99,9 @@ def test_user_creation():
         test_user, created = UsersModel.objects.get_or_create(
             telegram_id=999999999,
             defaults={
-                "first_name": "تست",
-                "last_name": "کاربر",
+                "id_tel": "999999999",
+                "username_tel": "test_user",
+                "full_name": "کاربر تستی",
                 "username": "test_user"
             }
         )

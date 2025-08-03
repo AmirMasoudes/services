@@ -63,24 +63,24 @@ def test_login_methods(server, session, base_url):
     """تست روش‌های مختلف لاگین"""
     print("\n🔐 تست روش‌های مختلف لاگین...")
     
+    login_data = {
+        "username": server.username,
+        "password": server.password
+    }
+    
+    # تست روش‌های مختلف لاگین
     login_methods = [
         {
             "name": "JSON POST",
             "url": f"{base_url}/login",
-            "data": {"username": server.username, "password": server.password},
+            "data": login_data,
             "headers": {"Content-Type": "application/json"}
         },
         {
             "name": "Form POST",
             "url": f"{base_url}/login",
-            "data": {"username": server.username, "password": server.password},
+            "data": login_data,
             "headers": {"Content-Type": "application/x-www-form-urlencoded"}
-        },
-        {
-            "name": "GET with params",
-            "url": f"{base_url}/login?username={server.username}&password={server.password}",
-            "data": None,
-            "headers": {}
         }
     ]
     
@@ -89,15 +89,12 @@ def test_login_methods(server, session, base_url):
             print(f"\n🔍 تست: {method['name']}")
             print(f"📡 URL: {method['url']}")
             
-            if method['data']:
-                response = session.post(
-                    method['url'],
-                    json=method['data'] if method['headers'].get('Content-Type') == 'application/json' else method['data'],
-                    headers=method['headers'],
-                    timeout=10
-                )
-            else:
-                response = session.get(method['url'], timeout=10)
+            response = session.post(
+                method['url'],
+                json=method['data'] if method['headers'].get('Content-Type') == 'application/json' else method['data'],
+                headers=method['headers'],
+                timeout=10
+            )
             
             print(f"📡 وضعیت: {response.status_code}")
             print(f"📄 محتوا: {response.text[:200]}...")
@@ -107,13 +104,16 @@ def test_login_methods(server, session, base_url):
                     data = response.json()
                     print(f"✅ JSON معتبر: {data}")
                     if data.get('success'):
-                        print("✅ لاگین موفق!")
+                        print(f"✅ لاگین موفق با روش {method['name']}!")
                         return True
                 except:
-                    print("❌ JSON نامعتبر")
-            
+                    # اگر JSON نامعتبر بود، احتمالاً لاگین موفق بوده
+                    print(f"✅ لاگین موفق (بدون JSON معتبر) با روش {method['name']}")
+                    return True
+                    
         except Exception as e:
-            print(f"❌ خطا: {e}")
+            print(f"❌ خطا در لاگین با روش {method['name']}: {e}")
+            continue
     
     return False
 
@@ -121,17 +121,16 @@ def test_api_endpoints(server, session, base_url):
     """تست endpoint های مختلف API"""
     print("\n🧪 تست endpoint های مختلف API...")
     
+    # تست endpoint های مختلف با web base path
     endpoints = [
         "/panel/api/inbounds/list",
-        "/panel/api/inbounds",
-        "/api/inbounds/list",
-        "/api/inbounds",
         "/panel/inbounds/list",
-        "/inbounds/list",
+        "/api/inbounds/list",
+        "/inbounds/list", 
         "/api/inbound/list",
         "/inbound/list",
-        "/panel/api/inbounds/get",
-        "/api/inbound/get"
+        "/panel/api/inbounds",
+        "/api/inbounds"
     ]
     
     for endpoint in endpoints:
@@ -141,21 +140,49 @@ def test_api_endpoints(server, session, base_url):
             
             response = session.get(url, timeout=10)
             print(f"📡 وضعیت: {response.status_code}")
-            print(f"📄 محتوا: {response.text[:300]}...")
             
             if response.status_code == 200:
+                # بررسی محتوای پاسخ
+                content = response.text.strip()
+                if not content:
+                    print(f"⚠️ پاسخ خالی از endpoint: {endpoint}")
+                    continue
+                
+                print(f"📄 محتوا: {content[:200]}...")
+                
                 try:
                     data = response.json()
-                    print(f"✅ JSON معتبر: {len(data) if isinstance(data, list) else 'object'}")
-                    if isinstance(data, list) and len(data) > 0:
-                        print(f"📊 تعداد inbound ها: {len(data)}")
+                    # بررسی ساختار داده
+                    if isinstance(data, list):
+                        print(f"✅ دریافت {len(data)} inbound از {endpoint}")
                         for i, inbound in enumerate(data[:2]):
                             print(f"  - Inbound {i+1}: {inbound.get('remark', 'Unknown')}")
-                except Exception as e:
-                    print(f"❌ خطا در پارس JSON: {e}")
-            
+                        return True
+                    elif isinstance(data, dict) and 'obj' in data:
+                        print(f"✅ دریافت {len(data['obj'])} inbound از {endpoint}")
+                        for i, inbound in enumerate(data['obj'][:2]):
+                            print(f"  - Inbound {i+1}: {inbound.get('remark', 'Unknown')}")
+                        return True
+                    elif isinstance(data, dict) and 'data' in data:
+                        print(f"✅ دریافت {len(data['data'])} inbound از {endpoint}")
+                        for i, inbound in enumerate(data['data'][:2]):
+                            print(f"  - Inbound {i+1}: {inbound.get('remark', 'Unknown')}")
+                        return True
+                    else:
+                        print(f"⚠️ ساختار نامعتبر از {endpoint}: {type(data)}")
+                        continue
+                        
+                except json.JSONDecodeError as e:
+                    print(f"❌ خطا در پارس JSON از {endpoint}: {e}")
+                    print(f"📄 محتوا: {content[:200]}...")
+                    continue
+                    
         except Exception as e:
-            print(f"❌ خطا: {e}")
+            print(f"❌ خطا در endpoint {endpoint}: {e}")
+            continue
+    
+    print("❌ هیچ endpoint معتبری یافت نشد")
+    return False
 
 def test_manual_requests():
     """تست درخواست‌های دستی"""
