@@ -492,7 +492,7 @@ class UserConfigService:
                 config_data=config_data,
                 protocol=protocol,
                 is_trial=True,
-                created_at=timezone.now()
+                expires_at=timezone.now() + timedelta(hours=24)
             )
             
             return user_config, xui_settings.SUCCESS_MESSAGES["trial_created"].format(protocol=protocol.upper())
@@ -583,7 +583,7 @@ class UserConfigService:
                 protocol=protocol,
                 plan=plan,
                 is_trial=False,
-                created_at=timezone.now()
+                expires_at=timezone.now() + timedelta(days=30)
             )
             
             return user_config, xui_settings.SUCCESS_MESSAGES["paid_created"].format(protocol=protocol.upper())

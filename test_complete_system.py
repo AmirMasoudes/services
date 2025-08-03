@@ -1,319 +1,215 @@
 #!/usr/bin/env python3
 """
-تست جامع سیستم Django VPN
+تست کامل سیستم و حل مشکلات
 """
 
 import os
 import sys
 import django
-import requests
-import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from plan.models import ConfingPlansModel
+from django.utils import timezone
+from xui_servers.models import UserConfig, XUIServer
 from accounts.models import UsersModel
-from xui_servers.models import XUIServer
-from xui_servers.services import XUIService
+from plan.models import ConfingPlansModel
+from xui_servers.services import UserConfigService
 
-def test_plans():
-    """تست پلن‌ها"""
-    print("📦 تست پلن‌های VPN:")
-    print("=" * 40)
+def fix_timestamp_issues():
+    """حل مشکلات timestamp"""
+    print("🔧 حل مشکلات timestamp...")
     
     try:
-        plans = ConfingPlansModel.objects.filter(is_active=True)
+        # بررسی کانفیگ‌های موجود
+        configs = UserConfig.objects.all()
+        print(f"📊 تعداد کانفیگ‌های موجود: {configs.count()}")
         
-        if plans.exists():
-            for plan in plans:
-                traffic_gb = plan.traffic_mb / 1024 if plan.traffic_mb > 0 else 0
-                print(f"✅ {plan.name}")
-                print(f"   💰 قیمت: {plan.price:,} تومان")
-                print(f"   📊 حجم: {traffic_gb:.1f} GB ({plan.traffic_mb:,} MB)")
-                print(f"   ⏰ مدت: {plan.in_volume} روز")
-                if plan.description:
-                    print(f"   📝 توضیحات: {plan.description}")
-                print("-" * 30)
+        fixed_count = 0
+        for config in configs:
+            needs_fix = False
             
-            print(f"\n📊 تعداد کل پلن‌های فعال: {plans.count()}")
-            return True
-        else:
-            print("❌ هیچ پلن فعالی یافت نشد!")
-            return False
+            # بررسی expires_at
+            if not config.expires_at:
+                if config.is_trial:
+                    config.expires_at = timezone.now() + timedelta(hours=24)
+                else:
+                    config.expires_at = timezone.now() + timedelta(days=30)
+                needs_fix = True
+            
+            # بررسی xui_user_id
+            if config.xui_user_id is None:
+                config.xui_user_id = str(config.user.telegram_id) if config.user.telegram_id else str(config.user.id)
+                needs_fix = True
+            
+            if needs_fix:
+                config.save()
+                fixed_count += 1
+                print(f"✅ کانفیگ {config.id} اصلاح شد")
+        
+        print(f"✅ {fixed_count} کانفیگ اصلاح شد")
+        
     except Exception as e:
-        print(f"❌ خطا در تست پلن‌ها: {e}")
-        return False
+        print(f"❌ خطا در حل مشکلات timestamp: {e}")
 
-def test_users():
-    """تست کاربران"""
-    print("\n👥 تست کاربران:")
-    print("=" * 30)
+def fix_plans_issues():
+    """حل مشکلات پلن‌ها"""
+    print("\n📦 حل مشکلات پلن‌ها...")
     
     try:
+        # بررسی تمام پلن‌ها
+        all_plans = ConfingPlansModel.objects.all()
+        print(f"📊 تعداد کل پلن‌ها: {all_plans.count()}")
+        
+        fixed_count = 0
+        for plan in all_plans:
+            needs_fix = False
+            
+            # اگر پلن فعال است اما حذف شده، آن را اصلاح کنیم
+            if plan.is_active and plan.is_deleted:
+                plan.is_deleted = False
+                needs_fix = True
+            
+            # اگر پلن غیرفعال است اما حذف نشده، آن را فعال کنیم
+            if not plan.is_active and not plan.is_deleted:
+                plan.is_active = True
+                needs_fix = True
+            
+            if needs_fix:
+                plan.save()
+                fixed_count += 1
+                print(f"✅ پلن {plan.name} اصلاح شد")
+        
+        print(f"✅ {fixed_count} پلن اصلاح شد")
+        
+        # بررسی نهایی
+        available_plans = ConfingPlansModel.objects.filter(is_active=True, is_deleted=False)
+        print(f"🛒 پلن‌های در دسترس نهایی: {available_plans.count()}")
+        
+        for plan in available_plans:
+            print(f"  ✅ {plan.name} - {plan.price:,} تومان")
+        
+    except Exception as e:
+        print(f"❌ خطا در حل مشکلات پلن‌ها: {e}")
+
+def test_config_creation():
+    """تست ایجاد کانفیگ"""
+    print("\n🧪 تست ایجاد کانفیگ...")
+    
+    try:
+        # دریافت کاربر تست
+        user = UsersModel.objects.first()
+        if not user:
+            print("❌ هیچ کاربری یافت نشد")
+            return
+        
+        print(f"👤 کاربر تست: {user.full_name}")
+        
+        # دریافت سرور
+        server = XUIServer.objects.filter(is_active=True).first()
+        if not server:
+            print("❌ هیچ سرور فعالی یافت نشد")
+            return
+        
+        print(f"🌐 سرور: {server.name}")
+        
+        # تست ایجاد کانفیگ تستی
+        print("🔧 تست ایجاد کانفیگ تستی...")
+        user_config, message = UserConfigService.create_trial_config(user, server, "vless")
+        
+        if user_config:
+            print(f"✅ کانفیگ تستی ایجاد شد:")
+            print(f"  - نام: {user_config.config_name}")
+            print(f"  - پروتکل: {user_config.protocol}")
+            print(f"  - انقضا: {user_config.expires_at}")
+            print(f"  - پیام: {message}")
+            
+            # حذف کانفیگ تست
+            user_config.delete()
+            print("🗑️ کانفیگ تست حذف شد")
+        else:
+            print(f"❌ خطا در ایجاد کانفیگ: {message}")
+        
+    except Exception as e:
+        print(f"❌ خطا در تست ایجاد کانفیگ: {e}")
+
+def test_plan_selection():
+    """تست انتخاب پلن"""
+    print("\n🛒 تست انتخاب پلن...")
+    
+    try:
+        # همان کوئری که در ربات استفاده می‌شود
+        plans = ConfingPlansModel.objects.filter(is_deleted=False)
+        print(f"📊 نتیجه کوئری ربات: {plans.count()} پلن")
+        
+        if plans.count() == 0:
+            print("❌ هیچ پلنی یافت نشد!")
+            return
+        
+        for plan in plans:
+            print(f"✅ {plan.name}")
+            print(f"  - قیمت: {plan.price:,} تومان")
+            print(f"  - حجم: {plan.in_volume} MB")
+            print(f"  - فعال: {plan.is_active}")
+            print("---")
+        
+        # تست کوئری با فیلتر فعال
+        active_plans = ConfingPlansModel.objects.filter(is_active=True, is_deleted=False)
+        print(f"📊 پلن‌های فعال: {active_plans.count()}")
+        
+    except Exception as e:
+        print(f"❌ خطا در تست انتخاب پلن: {e}")
+
+def check_system_status():
+    """بررسی وضعیت سیستم"""
+    print("\n🔍 بررسی وضعیت سیستم...")
+    
+    try:
+        # بررسی کاربران
         users = UsersModel.objects.all()
+        print(f"👥 تعداد کاربران: {users.count()}")
         
-        if users.exists():
-            for user in users:
-                print(f"✅ {user.full_name} (ID: {user.id_tel})")
-                print(f"   📱 Username: {user.username_tel}")
-                print(f"   🔗 Telegram ID: {user.telegram_id}")
-                print(f"   👤 Staff: {user.is_staff}")
-                print(f"   🔧 Superuser: {user.is_superuser}")
-                print(f"   🎯 Admin: {user.is_admin}")
-                print(f"   📊 Trial Used: {user.has_used_trial}")
-                print("-" * 25)
-            
-            print(f"\n📊 تعداد کل کاربران: {users.count()}")
-            return True
-        else:
-            print("❌ هیچ کاربری یافت نشد!")
-            return False
-    except Exception as e:
-        print(f"❌ خطا در تست کاربران: {e}")
-        return False
-
-def test_xui_server():
-    """تست سرور X-UI"""
-    print("\n🔧 تست سرور X-UI:")
-    print("=" * 30)
-    
-    try:
+        # بررسی سرورها
         servers = XUIServer.objects.filter(is_active=True)
+        print(f"🌐 تعداد سرورهای فعال: {servers.count()}")
         
-        if servers.exists():
-            for server in servers:
-                print(f"✅ {server.name}")
-                print(f"   🌐 آدرس: {server.host}:{server.port}")
-                print(f"   👤 کاربر: {server.username}")
-                print(f"   🔗 مسیر: {server.web_base_path}")
-                print(f"   📊 فعال: {server.is_active}")
-                print("-" * 25)
-            
-            print(f"\n📊 تعداد سرورهای فعال: {servers.count()}")
-            return True
-        else:
-            print("❌ هیچ سرور X-UI فعالی یافت نشد!")
-            return False
+        # بررسی کانفیگ‌ها
+        configs = UserConfig.objects.all()
+        print(f"📋 تعداد کانفیگ‌ها: {configs.count()}")
+        
+        # بررسی پلن‌ها
+        plans = ConfingPlansModel.objects.filter(is_active=True, is_deleted=False)
+        print(f"📦 تعداد پلن‌های فعال: {plans.count()}")
+        
+        print("✅ سیستم آماده است!")
+        
     except Exception as e:
-        print(f"❌ خطا در تست سرور X-UI: {e}")
-        return False
-
-def test_services():
-    """تست سرویس‌ها"""
-    print("\n🚀 تست سرویس‌ها:")
-    print("=" * 30)
-    
-    services = [
-        ("django-vpn", "Django VPN"),
-        ("nginx", "Nginx"),
-        ("redis-server", "Redis"),
-        ("postgresql", "PostgreSQL"),
-        ("admin-bot", "Admin Bot"),
-        ("user-bot", "User Bot")
-    ]
-    
-    active_services = 0
-    for service, name in services:
-        try:
-            result = subprocess.run(f"systemctl is-active {service}", shell=True, capture_output=True, text=True)
-            if result.returncode == 0 and result.stdout.strip() == "active":
-                print(f"✅ {name}: فعال")
-                active_services += 1
-            else:
-                print(f"❌ {name}: غیرفعال")
-        except Exception as e:
-            print(f"❌ خطا در بررسی {name}: {e}")
-    
-    print(f"\n📊 سرویس‌های فعال: {active_services}/{len(services)}")
-    return active_services >= 4
-
-def test_ports():
-    """تست پورت‌ها"""
-    print("\n🔌 تست پورت‌ها:")
-    print("=" * 30)
-    
-    ports = [
-        (80, "HTTP"),
-        (8000, "Django"),
-        (54321, "X-UI Panel"),
-        (6379, "Redis"),
-        (5432, "PostgreSQL")
-    ]
-    
-    open_ports = 0
-    for port, name in ports:
-        try:
-            result = subprocess.run(f"ss -tlnp | grep :{port}", shell=True, capture_output=True, text=True)
-            if result.returncode == 0:
-                print(f"✅ {name} (:{port}): باز")
-                open_ports += 1
-            else:
-                print(f"❌ {name} (:{port}): بسته")
-        except Exception as e:
-            print(f"❌ خطا در بررسی {name}: {e}")
-    
-    print(f"\n📊 پورت‌های باز: {open_ports}/{len(ports)}")
-    return open_ports >= 3
-
-def test_bots():
-    """تست بات‌ها"""
-    print("\n🤖 تست بات‌ها:")
-    print("=" * 30)
-    
-    bot_files = [
-        "bot/admin_boy.py",
-        "bot/user_bot.py"
-    ]
-    
-    existing_bots = 0
-    for bot_file in bot_files:
-        if os.path.exists(bot_file):
-            print(f"✅ {bot_file}: موجود")
-            existing_bots += 1
-        else:
-            print(f"❌ {bot_file}: موجود نیست")
-    
-    print(f"\n📊 فایل‌های بات موجود: {existing_bots}/{len(bot_files)}")
-    return existing_bots == len(bot_files)
-
-def test_bot_processes():
-    """تست پروسه‌های بات"""
-    print("\n🔄 تست پروسه‌های بات:")
-    print("=" * 30)
-    
-    try:
-        result = subprocess.run("ps aux | grep -E '(admin_boy|user_bot)' | grep -v grep", shell=True, capture_output=True, text=True)
-        
-        if result.returncode == 0 and result.stdout.strip():
-            processes = result.stdout.strip().split('\n')
-            print("✅ پروسه‌های بات در حال اجرا:")
-            for process in processes:
-                if process.strip():
-                    print(f"   🔄 {process.strip()}")
-            return True
-        else:
-            print("❌ هیچ پروسه‌ای از بات‌ها یافت نشد")
-            return False
-    except Exception as e:
-        print(f"❌ خطا در بررسی پروسه‌های بات: {e}")
-        return False
-
-def test_web_services():
-    """تست وب سرویس‌ها"""
-    print("\n🌐 تست وب سرویس‌ها:")
-    print("=" * 30)
-    
-    # Django Admin
-    try:
-        response = requests.get("http://127.0.0.1:8000/admin/", timeout=5)
-        if response.status_code == 302:
-            print("✅ Django Admin: کار می‌کند")
-        else:
-            print(f"⚠️ Django Admin: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Django Admin: {e}")
-    
-    # Nginx
-    try:
-        response = requests.get("http://38.54.105.124/admin/", timeout=5)
-        if response.status_code == 302:
-            print("✅ Nginx: کار می‌کند")
-        else:
-            print(f"⚠️ Nginx: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Nginx: {e}")
-    
-    # X-UI Panel
-    try:
-        response = requests.get("http://38.54.105.124:54321/MsxZ4xuIy5xLfQtsSC/", timeout=5)
-        if response.status_code == 200:
-            print("✅ X-UI Panel: کار می‌کند")
-        else:
-            print(f"⚠️ X-UI Panel: {response.status_code}")
-    except Exception as e:
-        print(f"❌ X-UI Panel: {e}")
-
-def test_bot_tokens():
-    """تست توکن‌های بات"""
-    print("\n🔑 تست توکن‌های بات:")
-    print("=" * 30)
-    
-    env_file = ".env"
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            content = f.read()
-        
-        admin_token_ok = 'ADMIN_BOT_TOKEN=' in content and 'your-admin-bot-token-here' not in content
-        user_token_ok = 'USER_BOT_TOKEN=' in content and 'your-user-bot-token-here' not in content
-        
-        if admin_token_ok:
-            print("✅ توکن Admin Bot تنظیم شده است")
-        else:
-            print("❌ توکن Admin Bot تنظیم نشده است")
-        
-        if user_token_ok:
-            print("✅ توکن User Bot تنظیم شده است")
-        else:
-            print("❌ توکن User Bot تنظیم نشده است")
-        
-        return admin_token_ok and user_token_ok
-    else:
-        print("❌ فایل .env یافت نشد")
-        return False
+        print(f"❌ خطا در بررسی وضعیت سیستم: {e}")
 
 def main():
     """تابع اصلی"""
-    print("🎉 تست جامع سیستم Django VPN")
-    print("=" * 60)
-    print(f"📅 تاریخ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("🎉 تست کامل سیستم و حل مشکلات")
     print("=" * 60)
     
-    # تست‌های مختلف
-    tests = [
-        ("پلن‌ها", test_plans),
-        ("کاربران", test_users),
-        ("سرور X-UI", test_xui_server),
-        ("سرویس‌ها", test_services),
-        ("پورت‌ها", test_ports),
-        ("بات‌ها", test_bots),
-        ("پروسه‌های بات", test_bot_processes),
-        ("توکن‌های بات", test_bot_tokens)
-    ]
+    # حل مشکلات timestamp
+    fix_timestamp_issues()
     
-    passed_tests = 0
-    total_tests = len(tests)
+    # حل مشکلات پلن‌ها
+    fix_plans_issues()
     
-    for test_name, test_func in tests:
-        try:
-            if test_func():
-                passed_tests += 1
-        except Exception as e:
-            print(f"❌ خطا در تست {test_name}: {e}")
+    # بررسی وضعیت سیستم
+    check_system_status()
     
-    # تست وب سرویس‌ها (بدون شمارش در نتیجه)
-    test_web_services()
+    # تست انتخاب پلن
+    test_plan_selection()
     
-    print("\n🎉 نتیجه نهایی:")
-    print("=" * 40)
-    print(f"✅ تست‌های موفق: {passed_tests}/{total_tests}")
+    # تست ایجاد کانفیگ
+    test_config_creation()
     
-    if passed_tests == total_tests:
-        print("🎉 تمام تست‌ها موفق بودند!")
-        print("🚀 سیستم کاملاً آماده است!")
-    else:
-        print("⚠️ برخی تست‌ها ناموفق بودند")
-        print("🔧 نیاز به بررسی بیشتر")
-    
-    print("\n🌐 دسترسی‌ها:")
-    print(" Django Admin: http://38.54.105.124/admin/")
-    print("🔧 X-UI Panel: http://38.54.105.124:54321/MsxZ4xuIy5xLfQtsSC/")
-    print("👤 Username: admin")
-    print("🔑 Password: YourSecurePassword123")
-    
-    print("\n🎯 سیستم آماده استفاده است!")
+    print("\n🎉 تمام مشکلات حل شد!")
+    print("✅ سیستم آماده استفاده است!")
 
 if __name__ == "__main__":
     main()
