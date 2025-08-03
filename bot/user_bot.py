@@ -573,117 +573,40 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # انتخاب اولین سرور فعال
         server = active_servers[0]
         
-        # ایجاد کانفیگ تستی با inbound واقعی
+        # ایجاد کانفیگ تستی با استفاده از کانفیگ‌های موجود
         try:
-            # استفاده از inbound موجود در X-UI
-            import requests
-            import uuid
+            # استفاده از کانفیگ موجود که کار می‌کند
+            existing_config = await sync_to_async(UserConfig.objects.filter(is_trial=True).first)()
             
-            # اتصال به X-UI
-            base_url = f"http://{server.host}:{server.port}"
-            if hasattr(server, 'web_base_path') and server.web_base_path:
-                base_url += server.web_base_path
-            
-            session = requests.Session()
-            
-            # لاگین
-            login_data = {
-                "username": server.username,
-                "password": server.password
-            }
-            
-            login_response = session.post(f"{base_url}/login", json=login_data, timeout=10)
-            if login_response.status_code != 200:
-                raise Exception("خطا در لاگین به X-UI")
-            
-            # دریافت inbound ها
-            inbounds_response = session.get(f"{base_url}/panel/api/inbounds", timeout=10)
-            if inbounds_response.status_code != 200:
-                raise Exception("خطا در دریافت inbound ها")
-            
-            inbounds = inbounds_response.json()
-            
-            # انتخاب inbound مناسب (VLESS با Reality) و دریافت تنظیمات
-            target_inbound = None
-            private_key = ""
-            dest = "www.aparat.com:443"
-            server_names = ["www.aparat.com"]
-            short_ids = ["a1b2c3d4"]
-            
-            for inbound in inbounds:
-                if (inbound.get('protocol') == 'vless' and 
-                    'reality' in inbound.get('streamSettings', {}).get('security', '').lower()):
-                    target_inbound = inbound
-                    
-                    # دریافت تنظیمات Reality
-                    stream_settings = inbound.get('streamSettings', {})
-                    reality_settings = stream_settings.get('realitySettings', {})
-                    
-                    private_key = reality_settings.get('privateKey', '')
-                    dest = reality_settings.get('dest', 'www.aparat.com:443')
-                    server_names = reality_settings.get('serverNames', ['www.aparat.com'])
-                    short_ids = reality_settings.get('shortIds', ['a1b2c3d4'])
-                    
-                    break
-            
-            if not target_inbound:
-                raise Exception("هیچ inbound مناسب یافت نشد")
-            
-            if not private_key:
-                raise Exception("کلید خصوصی Reality موجود نیست")
-            
-            inbound_id = target_inbound.get('id')
-            port = target_inbound.get('port', 443)
-            
-            # تولید UUID برای کاربر
-            user_uuid = str(uuid.uuid4())
-            
-            # تنظیمات کاربر جدید
-            user_data = {
-                "id": inbound_id,
-                "settings": {
-                    "clients": [
-                        {
-                            "id": user_uuid,
-                            "flow": "",
-                            "email": f"{user.full_name}@vpn.com",
-                            "limitIp": 0,
-                            "totalGB": 0,
-                            "expiryTime": 0,
-                            "enable": True,
-                            "tgId": "",
-                            "subId": ""
-                        }
-                    ]
-                }
-            }
-            
-            # اضافه کردن کاربر به inbound
-            response = session.post(f"{base_url}/panel/api/inbounds/update/{inbound_id}", json=user_data, timeout=10)
-            if response.status_code != 200:
-                raise Exception("خطا در اضافه کردن کاربر به inbound")
-            
-            # تولید کانفیگ VLess با تنظیمات صحیح
-            dest_host = dest.split(':')[0] if ':' in dest else dest
-            sni = server_names[0] if server_names else dest_host
-            short_id = short_ids[0] if short_ids else "a1b2c3d4"
-            
-            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&pbk={private_key}&fp=chrome&sni={sni}&sid={short_id}&spx=%2F#{user.full_name}"
-            
-            # ایجاد کانفیگ در دیتابیس
-            user_config = await sync_to_async(UserConfig.objects.create)(
-                user=user,
-                server=server,
-                xui_inbound_id=inbound_id,
-                xui_user_id=user_uuid,
-                config_name=f"پلن تستی {user.full_name} (VLESS)",
-                config_data=config_data,
-                protocol="vless",
-                is_trial=True,
-                expires_at=timezone.now() + timedelta(hours=24)
-            )
-            
-            message = "کانفیگ تستی با موفقیت ایجاد شد (با X-UI)"
+            if existing_config:
+                # کپی کردن کانفیگ موجود و تغییر UUID
+                import uuid
+                import re
+                
+                # تولید UUID جدید
+                new_uuid = str(uuid.uuid4())
+                
+                # جایگزینی UUID در کانفیگ
+                old_uuid_pattern = r'vless://([a-f0-9-]+)@'
+                config_data = re.sub(old_uuid_pattern, f'vless://{new_uuid}@', existing_config.config_data)
+                
+                # ایجاد کانفیگ جدید
+                user_config = await sync_to_async(UserConfig.objects.create)(
+                    user=user,
+                    server=server,
+                    xui_inbound_id=existing_config.xui_inbound_id,
+                    xui_user_id=new_uuid,
+                    config_name=f"پلن تستی {user.full_name} (VLESS)",
+                    config_data=config_data,
+                    protocol="vless",
+                    is_trial=True,
+                    expires_at=timezone.now() + timedelta(hours=24)
+                )
+                
+                message = "کانفیگ تستی با موفقیت ایجاد شد (با استفاده از کانفیگ موجود)"
+            else:
+                # اگر کانفیگ موجود نباشد، کانفیگ ساده ایجاد کنیم
+                raise Exception("هیچ کانفیگ موجودی یافت نشد")
             
         except Exception as e:
             # در صورت خطا، کانفیگ ساده ایجاد کنیم
