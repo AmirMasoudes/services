@@ -10,6 +10,7 @@ from .models import XUIServer, UserConfig
 from . import settings as xui_settings
 from accounts.models import UsersModel
 from plan.models import ConfingPlansModel
+from .api_models import XUIAPIBuilder, XUIAPIClient, XUIClient, XUIInbound
 
 class XUIService:
     """سرویس برای اتصال به X-UI"""
@@ -156,59 +157,25 @@ class XUIService:
                     int(xui_settings.PORT_SETTINGS["max_port"])
                 )
             
-            # ایجاد inbound جدید
-            inbound_data = {
-                "up": 0,
-                "down": 0,
-                "total": 0,
-                "remark": f"User_{user_id}_{protocol}",
-                "enable": True,
-                "expiryTime": 0,
-                "listen": "",
-                "port": port,
-                "protocol": protocol,
-                "settings": {
-                    "clients": [],
-                    "decryption": "none",
-                    "fallbacks": []
-                },
-                "streamSettings": {
-                    "network": "tcp",
-                    "security": "none",
-                    "tcpSettings": {
-                        "header": {
-                            "type": "none"
-                        }
-                    }
-                },
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls"]
-                }
-            }
-            
-            # ارسال درخواست ایجاد inbound
-            response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/add",
-                json=inbound_data,
-                timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
+            # ایجاد inbound با مدل جدید
+            inbound = XUIAPIBuilder.create_inbound_payload(
+                port=port,
+                protocol=protocol,
+                remark=f"User_{user_id}_{protocol}"
             )
             
-            if response.status_code == 200:
-                try:
-                    result = response.json()
-                    if result.get('success'):
-                        inbound_id = result.get('obj', {}).get('id')
-                        print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
-                        return inbound_id
-                    else:
-                        print(f"❌ خطا در ایجاد inbound: {result.get('msg', 'خطای نامشخص')}")
-                except:
-                    print("❌ خطا در پارس پاسخ ایجاد inbound")
-            else:
-                print(f"❌ خطا در ایجاد inbound - وضعیت: {response.status_code}")
+            # ایجاد API کلاینت
+            api_client = XUIAPIClient(self.base_url, self.session)
             
-            return None
+            # ارسال درخواست ایجاد inbound
+            inbound_id = api_client.create_inbound(inbound)
+            
+            if inbound_id:
+                print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
+                return inbound_id
+            else:
+                print("❌ خطا در ایجاد inbound")
+                return None
             
         except Exception as e:
             print(f"خطا در ایجاد inbound: {e}")
@@ -270,38 +237,34 @@ class XUIService:
     def create_user(self, inbound_id: int, user_data: dict):
         """ایجاد کاربر در X-UI"""
         try:
-            payload = {
-                "id": inbound_id,
-                "settings": {
-                    "clients": [user_data]
-                }
-            }
+            # تبدیل user_data به XUIClient
+            client = XUIClient(
+                id=user_data.get('id', str(uuid.uuid4())),
+                email=user_data.get('email', ''),
+                security=user_data.get('security', 'auto'),
+                limit_ip=user_data.get('limitIp', 0),
+                total_gb=user_data.get('totalGB', 0),
+                expiry_time=user_data.get('expiryTime', 0),
+                enable=user_data.get('enable', True),
+                tg_id=user_data.get('tgId', ''),
+                sub_id=user_data.get('subId', str(uuid.uuid4()).replace("-", "")[:16]),
+                comment=user_data.get('comment', ''),
+                reset=user_data.get('reset', 0),
+                flow=user_data.get('flow', '')
+            )
             
-            # تست endpoint های مختلف برای ایجاد کاربر
-            update_endpoints = [
-                "/api/inbounds/updateClient",
-                "/inbounds/updateClient",
-                "/api/inbound/updateClient",
-                "/inbound/updateClient",
-                "/panel/api/inbounds/updateClient",
-                "/panel/inbounds/updateClient"
-            ]
+            # ایجاد API کلاینت
+            api_client = XUIAPIClient(self.base_url, self.session)
             
-            for endpoint in update_endpoints:
-                try:
-                    response = self.session.post(
-                        f"{self.base_url}{endpoint}",
-                        json=payload,
-                        timeout=10
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        return data.get('success', False)
-                except Exception:
-                    continue
+            # اضافه کردن کلاینت به inbound
+            success = api_client.add_client(inbound_id, client)
             
-            return False
+            if success:
+                print(f"✅ کاربر با موفقیت به Inbound {inbound_id} اضافه شد")
+            else:
+                print(f"❌ خطا در اضافه کردن کاربر به Inbound {inbound_id}")
+            
+            return success
             
         except Exception as e:
             print(f"خطا در ایجاد کاربر: {e}")

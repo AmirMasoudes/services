@@ -206,30 +206,7 @@ def test_xui_api(server):
         
         print("❌ هیچ endpoint معتبری یافت نشد")
         return False
-                                    except Exception as e:
-                                        print(f"❌ خطا در پارس JSON: {e}")
-                                        print(f"📄 محتوا: {content[:200]}...")
-                                else:
-                                    print("⚠️ پاسخ خالی")
-                            else:
-                                print(f"❌ خطای HTTP: {response.status_code}")
-                                
-                        except Exception as e:
-                            print(f"❌ خطا: {e}")
-                    
-                    print("❌ هیچ endpoint معتبری یافت نشد")
-                    return False
-                else:
-                    print("❌ لاگین ناموفق")
-                    return False
-                    
-            except Exception as e:
-                print(f"❌ خطا در پارس JSON لاگین: {e}")
-                return False
-        else:
-            print("❌ خطا در لاگین")
-            return False
-            
+        
     except Exception as e:
         print(f"❌ خطا در تست API: {e}")
         return False
