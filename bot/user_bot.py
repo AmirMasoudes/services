@@ -603,16 +603,34 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             inbounds = inbounds_response.json()
             
-            # انتخاب inbound مناسب (VLESS با Reality)
+            # انتخاب inbound مناسب (VLESS با Reality) و دریافت تنظیمات
             target_inbound = None
+            private_key = ""
+            dest = "www.aparat.com:443"
+            server_names = ["www.aparat.com"]
+            short_ids = ["a1b2c3d4"]
+            
             for inbound in inbounds:
                 if (inbound.get('protocol') == 'vless' and 
                     'reality' in inbound.get('streamSettings', {}).get('security', '').lower()):
                     target_inbound = inbound
+                    
+                    # دریافت تنظیمات Reality
+                    stream_settings = inbound.get('streamSettings', {})
+                    reality_settings = stream_settings.get('realitySettings', {})
+                    
+                    private_key = reality_settings.get('privateKey', '')
+                    dest = reality_settings.get('dest', 'www.aparat.com:443')
+                    server_names = reality_settings.get('serverNames', ['www.aparat.com'])
+                    short_ids = reality_settings.get('shortIds', ['a1b2c3d4'])
+                    
                     break
             
             if not target_inbound:
                 raise Exception("هیچ inbound مناسب یافت نشد")
+            
+            if not private_key:
+                raise Exception("کلید خصوصی Reality موجود نیست")
             
             inbound_id = target_inbound.get('id')
             port = target_inbound.get('port', 443)
@@ -645,8 +663,12 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if response.status_code != 200:
                 raise Exception("خطا در اضافه کردن کاربر به inbound")
             
-            # تولید کانفیگ VLess
-            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni=www.aparat.com&fp=chrome&pbk=K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz=&sid=a1b2c3d4&spx=%2F#{user.full_name}"
+            # تولید کانفیگ VLess با تنظیمات صحیح
+            dest_host = dest.split(':')[0] if ':' in dest else dest
+            sni = server_names[0] if server_names else dest_host
+            short_id = short_ids[0] if short_ids else "a1b2c3d4"
+            
+            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&pbk={private_key}&fp=chrome&sni={sni}&sid={short_id}&spx=%2F#{user.full_name}"
             
             # ایجاد کانفیگ در دیتابیس
             user_config = await sync_to_async(UserConfig.objects.create)(
