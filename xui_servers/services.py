@@ -444,8 +444,10 @@ class UserConfigService:
             
             # تولید اطلاعات کاربر
             user_uuid = str(uuid.uuid4())
+            timestamp = timezone.now().strftime(xui_settings.EMAIL_SETTINGS["timestamp_format"])
             user_email = xui_settings.EMAIL_SETTINGS["trial_format"].format(
-                telegram_id=user.telegram_id
+                telegram_id=user.telegram_id,
+                timestamp=timestamp
             )
             
             print(f"👤 ایجاد کاربر با UUID: {user_uuid}")
@@ -493,9 +495,11 @@ class UserConfigService:
             print("✅ کانفیگ تولید شد")
             
             # ذخیره در دیتابیس
+            expiry_date = timezone.now() + timedelta(hours=24)
             config_name = xui_settings.CONFIG_NAMING["trial_format"].format(
                 protocol=protocol.upper(),
-                user_name=user.get_display_name()
+                user_name=user.get_display_name(),
+                expiry=expiry_date.strftime(xui_settings.CONFIG_NAMING["expiry_format"])
             )
             
             print(f"💾 ذخیره کانفیگ در دیتابیس: {config_name}")
@@ -512,7 +516,10 @@ class UserConfigService:
                 expires_at=timezone.now() + timedelta(hours=24)
             )
             
-            return user_config, xui_settings.SUCCESS_MESSAGES["trial_created"].format(protocol=protocol.upper())
+            return user_config, xui_settings.SUCCESS_MESSAGES["trial_created"].format(
+                protocol=protocol.upper(),
+                duration=xui_settings.EXPIRY_SETTINGS["trial_hours"]
+            )
             
         except Exception as e:
             print(f"خطا در ایجاد کانفیگ تستی: {e}")
@@ -540,9 +547,11 @@ class UserConfigService:
             
             # تولید اطلاعات کاربر
             user_uuid = str(uuid.uuid4())
+            timestamp = timezone.now().strftime(xui_settings.EMAIL_SETTINGS["timestamp_format"])
             user_email = xui_settings.EMAIL_SETTINGS["paid_format"].format(
                 telegram_id=user.telegram_id,
-                plan_id=plan.id
+                plan_id=plan.id,
+                timestamp=timestamp
             )
             
             # محاسبه حجم داده (تبدیل MB به GB)
@@ -584,10 +593,12 @@ class UserConfigService:
                 return None, xui_settings.ERROR_MESSAGES["invalid_protocol"]
             
             # ذخیره در دیتابیس
+            expiry_date = timezone.now() + timedelta(days=xui_settings.EXPIRY_SETTINGS["paid_days"])
             config_name = xui_settings.CONFIG_NAMING["paid_format"].format(
                 plan_name=plan.name,
                 user_name=user.get_display_name(),
-                protocol=protocol.upper()
+                protocol=protocol.upper(),
+                expiry=expiry_date.strftime(xui_settings.CONFIG_NAMING["expiry_format"])
             )
             
             user_config = UserConfig.objects.create(
@@ -603,7 +614,11 @@ class UserConfigService:
                 expires_at=timezone.now() + timedelta(days=30)
             )
             
-            return user_config, xui_settings.SUCCESS_MESSAGES["paid_created"].format(protocol=protocol.upper())
+            return user_config, xui_settings.SUCCESS_MESSAGES["paid_created"].format(
+                protocol=protocol.upper(),
+                duration=xui_settings.EXPIRY_SETTINGS["paid_days"],
+                traffic=traffic_gb
+            )
             
         except Exception as e:
             print(f"خطا در ایجاد کانفیگ پولی: {e}")

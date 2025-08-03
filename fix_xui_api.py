@@ -80,133 +80,36 @@ def test_xui_connection(server):
         return False
 
 def test_xui_api(server):
-    """تست API XUI"""
-    print(f"\n🧪 تست API XUI...")
+    """تست API XUI با استفاده از XUIService"""
+    print(f"\n🧪 تست API XUI با XUIService...")
     
     try:
-        base_url = f"http://{server.host}:{server.port}"
-        if server.web_base_path:
-            base_url += server.web_base_path
+        from xui_servers.services import XUIService
         
-        session = requests.Session()
-        session.headers.update({
-            'Content-Type': 'application/json',
-            'User-Agent': 'Django-XUI-Bot/2.0'
-        })
+        # ایجاد سرویس XUI
+        xui_service = XUIService(server)
         
-        # تست لاگین با روش‌های مختلف
-        login_data = {
-            "username": server.username,
-            "password": server.password
-        }
-        
+        # تست لاگین
         print("🔐 تست لاگین...")
-        
-        # تست روش‌های مختلف لاگین
-        login_methods = [
-            {
-                "name": "JSON POST",
-                "data": login_data,
-                "headers": {"Content-Type": "application/json"}
-            },
-            {
-                "name": "Form POST",
-                "data": login_data,
-                "headers": {"Content-Type": "application/x-www-form-urlencoded"}
-            }
-        ]
-        
-        login_success = False
-        for method in login_methods:
-            try:
-                print(f"🔍 تست لاگین با روش: {method['name']}")
-                
-                response = session.post(
-                    f"{base_url}/login",
-                    json=method['data'] if method['headers'].get('Content-Type') == 'application/json' else method['data'],
-                    headers=method['headers'],
-                    timeout=10
-                )
-                
-                print(f"📡 وضعیت لاگین: {response.status_code}")
-                
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        print(f"✅ لاگین JSON: {data}")
-                        
-                        if data.get('success'):
-                            print(f"✅ لاگین موفق با روش {method['name']}!")
-                            login_success = True
-                            break
-                    except:
-                        # اگر JSON نامعتبر بود، احتمالاً لاگین موفق بوده
-                        print(f"✅ لاگین موفق (بدون JSON معتبر) با روش {method['name']}")
-                        login_success = True
-                        break
-                        
-            except Exception as e:
-                print(f"❌ خطا در لاگین با روش {method['name']}: {e}")
-                continue
-        
-        if not login_success:
+        if not xui_service.login():
             print("❌ لاگین ناموفق")
             return False
         
         print("✅ لاگین موفق!")
         
-        # تست API endpoints
-        endpoints = [
-            "/panel/api/inbounds/list",
-            "/panel/inbounds/list",
-            "/api/inbounds/list",
-            "/inbounds/list",
-            "/panel/api/inbounds",
-            "/api/inbounds"
-        ]
+        # تست دریافت inbound ها
+        print("📋 تست دریافت inbound ها...")
+        inbounds = xui_service.get_inbounds()
         
-        for endpoint in endpoints:
-            try:
-                url = f"{base_url}{endpoint}"
-                print(f"\n🔍 تست: {url}")
-                
-                response = session.get(url, timeout=10)
-                print(f"📡 وضعیت: {response.status_code}")
-                
-                if response.status_code == 200:
-                    content = response.text.strip()
-                    if not content:
-                        print(f"⚠️ پاسخ خالی از endpoint: {endpoint}")
-                        continue
-                    
-                    try:
-                        data = response.json()
-                        # بررسی ساختار داده
-                        if isinstance(data, list):
-                            print(f"✅ دریافت {len(data)} inbound از {endpoint}")
-                            return True
-                        elif isinstance(data, dict) and 'obj' in data:
-                            print(f"✅ دریافت {len(data['obj'])} inbound از {endpoint}")
-                            return True
-                        elif isinstance(data, dict) and 'data' in data:
-                            print(f"✅ دریافت {len(data['data'])} inbound از {endpoint}")
-                            return True
-                        else:
-                            print(f"⚠️ ساختار نامعتبر از {endpoint}: {type(data)}")
-                            continue
-                            
-                    except json.JSONDecodeError as e:
-                        print(f"❌ خطا در پارس JSON از {endpoint}: {e}")
-                        print(f"📄 محتوا: {content[:200]}...")
-                        continue
-                        
-            except Exception as e:
-                print(f"❌ خطا در endpoint {endpoint}: {e}")
-                continue
-        
-        print("❌ هیچ endpoint معتبری یافت نشد")
-        return False
-        
+        if inbounds and len(inbounds) > 0:
+            print(f"✅ دریافت {len(inbounds)} inbound")
+            for i, inbound in enumerate(inbounds[:3]):  # نمایش 3 inbound اول
+                print(f"  - Inbound {i+1}: {inbound.get('remark', 'Unknown')} (پورت: {inbound.get('port', 'نامشخص')})")
+            return True
+        else:
+            print("❌ هیچ inbound یافت نشد")
+            return False
+            
     except Exception as e:
         print(f"❌ خطا در تست API: {e}")
         return False
