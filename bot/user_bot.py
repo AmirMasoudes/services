@@ -573,35 +573,126 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # انتخاب اولین سرور فعال
         server = active_servers[0]
         
-        # ایجاد کانفیگ تستی ساده (بدون X-UI)
-        from xui_servers.models import UserConfig
-        import uuid
-        import random
-        import string
-        
-        # تولید کانفیگ VLess
-        user_uuid = str(uuid.uuid4())
-        fake_domain = random.choice(["www.aparat.com", "www.irib.ir", "www.varzesh3.com"])
-        public_key = random.choice(["H5jCG+N2boOAvWRFcntZJsSFCMn6xMOa1NfU+KR3Cw=", "K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz="])
-        short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
-        port = random.randint(10000, 65000)
-        
-        config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni={fake_domain}&fp=chrome&pbk={public_key}&sid={short_id}&spx=%2F#{user.full_name}"
-        
-        # ایجاد کانفیگ در دیتابیس
-        user_config = await sync_to_async(UserConfig.objects.create)(
-            user=user,
-            server=server,
-            xui_inbound_id=0,  # بدون X-UI
-            xui_user_id=str(user.telegram_id) if user.telegram_id else str(user.id),
-            config_name=f"پلن تستی {user.full_name} (VLESS)",
-            config_data=config_data,
-            protocol="vless",
-            is_trial=True,
-            expires_at=timezone.now() + timedelta(hours=24)
-        )
-        
-        message = "کانفیگ تستی با موفقیت ایجاد شد"
+        # ایجاد کانفیگ تستی با inbound واقعی
+        try:
+            # استفاده از inbound موجود در X-UI
+            import requests
+            import uuid
+            
+            # اتصال به X-UI
+            base_url = f"http://{server.host}:{server.port}"
+            if hasattr(server, 'web_base_path') and server.web_base_path:
+                base_url += server.web_base_path
+            
+            session = requests.Session()
+            
+            # لاگین
+            login_data = {
+                "username": server.username,
+                "password": server.password
+            }
+            
+            login_response = session.post(f"{base_url}/login", json=login_data, timeout=10)
+            if login_response.status_code != 200:
+                raise Exception("خطا در لاگین به X-UI")
+            
+            # دریافت inbound ها
+            inbounds_response = session.get(f"{base_url}/panel/api/inbounds", timeout=10)
+            if inbounds_response.status_code != 200:
+                raise Exception("خطا در دریافت inbound ها")
+            
+            inbounds = inbounds_response.json()
+            
+            # انتخاب inbound مناسب (VLESS با Reality)
+            target_inbound = None
+            for inbound in inbounds:
+                if (inbound.get('protocol') == 'vless' and 
+                    'reality' in inbound.get('streamSettings', {}).get('security', '').lower()):
+                    target_inbound = inbound
+                    break
+            
+            if not target_inbound:
+                raise Exception("هیچ inbound مناسب یافت نشد")
+            
+            inbound_id = target_inbound.get('id')
+            port = target_inbound.get('port', 443)
+            
+            # تولید UUID برای کاربر
+            user_uuid = str(uuid.uuid4())
+            
+            # تنظیمات کاربر جدید
+            user_data = {
+                "id": inbound_id,
+                "settings": {
+                    "clients": [
+                        {
+                            "id": user_uuid,
+                            "flow": "",
+                            "email": f"{user.full_name}@vpn.com",
+                            "limitIp": 0,
+                            "totalGB": 0,
+                            "expiryTime": 0,
+                            "enable": True,
+                            "tgId": "",
+                            "subId": ""
+                        }
+                    ]
+                }
+            }
+            
+            # اضافه کردن کاربر به inbound
+            response = session.post(f"{base_url}/panel/api/inbounds/update/{inbound_id}", json=user_data, timeout=10)
+            if response.status_code != 200:
+                raise Exception("خطا در اضافه کردن کاربر به inbound")
+            
+            # تولید کانفیگ VLess
+            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni=www.aparat.com&fp=chrome&pbk=K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz=&sid=a1b2c3d4&spx=%2F#{user.full_name}"
+            
+            # ایجاد کانفیگ در دیتابیس
+            user_config = await sync_to_async(UserConfig.objects.create)(
+                user=user,
+                server=server,
+                xui_inbound_id=inbound_id,
+                xui_user_id=user_uuid,
+                config_name=f"پلن تستی {user.full_name} (VLESS)",
+                config_data=config_data,
+                protocol="vless",
+                is_trial=True,
+                expires_at=timezone.now() + timedelta(hours=24)
+            )
+            
+            message = "کانفیگ تستی با موفقیت ایجاد شد (با X-UI)"
+            
+        except Exception as e:
+            # در صورت خطا، کانفیگ ساده ایجاد کنیم
+            from xui_servers.models import UserConfig
+            import uuid
+            import random
+            import string
+            
+            # تولید کانفیگ VLess
+            user_uuid = str(uuid.uuid4())
+            fake_domain = random.choice(["www.aparat.com", "www.irib.ir", "www.varzesh3.com"])
+            public_key = random.choice(["H5jCG+N2boOAvWRFcntZJsSFCMn6xMOa1NfU+KR3Cw=", "K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz="])
+            short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
+            port = random.randint(10000, 65000)
+            
+            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni={fake_domain}&fp=chrome&pbk={public_key}&sid={short_id}&spx=%2F#{user.full_name}"
+            
+            # ایجاد کانفیگ در دیتابیس
+            user_config = await sync_to_async(UserConfig.objects.create)(
+                user=user,
+                server=server,
+                xui_inbound_id=0,  # بدون X-UI
+                xui_user_id=str(user.telegram_id) if user.telegram_id else str(user.id),
+                config_name=f"پلن تستی {user.full_name} (VLESS)",
+                config_data=config_data,
+                protocol="vless",
+                is_trial=True,
+                expires_at=timezone.now() + timedelta(hours=24)
+            )
+            
+            message = f"کانفیگ تستی با موفقیت ایجاد شد (بدون X-UI) - خطا: {e}"
         
         if user_config:
             # علامت‌گذاری استفاده از پلن تستی
