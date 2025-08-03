@@ -573,8 +573,35 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # انتخاب اولین سرور فعال
         server = active_servers[0]
         
-        # ایجاد کانفیگ تستی در X-UI
-        user_config, message = await sync_to_async(UserConfigService.create_trial_config)(user, server)
+        # ایجاد کانفیگ تستی ساده (بدون X-UI)
+        from xui_servers.models import UserConfig
+        import uuid
+        import random
+        import string
+        
+        # تولید کانفیگ VLess
+        user_uuid = str(uuid.uuid4())
+        fake_domain = random.choice(["www.aparat.com", "www.irib.ir", "www.varzesh3.com"])
+        public_key = random.choice(["H5jCG+N2boOAvWRFcntZJsSFCMn6xMOa1NfU+KR3Cw=", "K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz="])
+        short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
+        port = random.randint(10000, 65000)
+        
+        config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni={fake_domain}&fp=chrome&pbk={public_key}&sid={short_id}&spx=%2F#{user.full_name}"
+        
+        # ایجاد کانفیگ در دیتابیس
+        user_config = await sync_to_async(UserConfig.objects.create)(
+            user=user,
+            server=server,
+            xui_inbound_id=0,  # بدون X-UI
+            xui_user_id=str(user.telegram_id) if user.telegram_id else str(user.id),
+            config_name=f"پلن تستی {user.full_name} (VLESS)",
+            config_data=config_data,
+            protocol="vless",
+            is_trial=True,
+            expires_at=timezone.now() + timedelta(hours=24)
+        )
+        
+        message = "کانفیگ تستی با موفقیت ایجاد شد"
         
         if user_config:
             # علامت‌گذاری استفاده از پلن تستی
