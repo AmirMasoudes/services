@@ -156,9 +156,10 @@ REST_FRAMEWORK = {
 }
 
 # تنظیمات ربات ادمین
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', 'YOUR_ADMIN_BOT_TOKEN')
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz')  # توکن نمونه - این را با TOKEN واقعی جایگزین کنید
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ADMIN_USER_IDS = [
     # ID های ادمین تلگرام - این‌ها را با ID های واقعی جایگزین کنید
-    # مثال: 123456789,
+    # برای پیدا کردن ID خود، به @userinfobot پیام دهید
+    123456789,  # مثال - این را با ID واقعی خود جایگزین کنید
 ]
