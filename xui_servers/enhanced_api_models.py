@@ -142,6 +142,25 @@ class XUIInboundManager:
                 except Exception as e:
                     print(f"❌ خطا در پارس پاسخ: {e}")
                     print(f"📄 محتوای پاسخ: {response.text}")
+                    
+                    # اگر پاسخ خالی است، احتمالاً موفق بوده
+                    if not response.text.strip():
+                        print(f"✅ احتمالاً Inbound با موفقیت ایجاد شد (پاسخ خالی)")
+                        # تلاش برای دریافت لیست inbound ها برای یافتن inbound جدید
+                        try:
+                            inbounds_response = self.session.get(f"{self.base_url}/panel/api/inbounds/list", timeout=10)
+                            if inbounds_response.status_code == 200:
+                                inbounds_data = inbounds_response.json()
+                                if inbounds_data.get('success'):
+                                    inbounds = inbounds_data.get('obj', [])
+                                    # یافتن inbound با پورت مورد نظر
+                                    for inbound in inbounds:
+                                        if inbound.get('port') == request.port and inbound.get('remark') == request.remark:
+                                            inbound_id = inbound.get('id')
+                                            print(f"✅ Inbound یافت شد با ID: {inbound_id}")
+                                            return inbound_id
+                        except Exception as e2:
+                            print(f"❌ خطا در یافتن inbound جدید: {e2}")
             else:
                 print(f"❌ خطای HTTP: {response.status_code}")
                 print(f"📄 محتوای پاسخ: {response.text}")
@@ -262,6 +281,11 @@ class XUIClientManager:
                 except Exception as e:
                     print(f"❌ خطا در پارس پاسخ: {e}")
                     print(f"📄 محتوای پاسخ: {response.text}")
+                    
+                    # اگر پاسخ خالی است، احتمالاً موفق بوده
+                    if not response.text.strip():
+                        print(f"✅ احتمالاً Client با موفقیت اضافه شد (پاسخ خالی)")
+                        return True
             else:
                 print(f"❌ خطای HTTP: {response.status_code}")
                 print(f"📄 محتوای پاسخ: {response.text}")

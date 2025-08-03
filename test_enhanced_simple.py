@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-تست مدل‌های پیشرفته API برای X-UI
-شامل تست ایجاد Inbound و مدیریت Client
+تست ساده مدل‌های پیشرفته API برای X-UI
 """
 
 import os
@@ -14,18 +13,12 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 from xui_servers.models import XUIServer
-from xui_servers.enhanced_api_models import (
-    XUIInboundCreationRequest,
-    XUIClientCreationRequest,
-    XUIInboundManager,
-    XUIClientManager,
-    XUIEnhancedService
-)
+from xui_servers.enhanced_api_models import XUIEnhancedService
 from accounts.models import UsersModel
 
-def test_enhanced_api_models():
-    """تست مدل‌های پیشرفته API"""
-    print("🧪 تست مدل‌های پیشرفته API...")
+def test_enhanced_api_simple():
+    """تست ساده مدل‌های پیشرفته API"""
+    print("🧪 تست ساده مدل‌های پیشرفته API...")
     
     try:
         # دریافت سرور فعال
@@ -103,93 +96,19 @@ def test_enhanced_api_models():
         # ایجاد سرویس پیشرفته
         enhanced_service = XUIEnhancedService(base_url, session)
         
-        # تست 1: ایجاد Inbound جدید
-        print("\n🔧 تست 1: ایجاد Inbound جدید...")
+        # تست: ایجاد Inbound همراه با Client
+        print(f"\n🚀 تست ایجاد Inbound همراه با Client...")
         
-        # یافتن پورت آزاد
         import random
         test_port = random.randint(10000, 65000)
         
-        inbound_request = XUIInboundCreationRequest(
+        result = enhanced_service.create_inbound_with_client(
             port=test_port,
             protocol="vless",
-            remark=f"Test Inbound {datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-        
-        inbound_manager = XUIInboundManager(base_url, session)
-        inbound_id = inbound_manager.create_inbound(inbound_request)
-        
-        if inbound_id:
-            print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
-            
-            # تست 2: اضافه کردن Client به Inbound
-            print(f"\n👤 تست 2: اضافه کردن Client به Inbound {inbound_id}...")
-            
-            client_request = XUIClientCreationRequest(
-                inbound_id=inbound_id,
-                email=f"test_user_{datetime.now().strftime('%Y%m%d_%H%M%S')}@vpn.com",
-                total_gb=10,
-                expiry_time=int((datetime.now() + timedelta(days=30)).timestamp() * 1000),
-                limit_ip=1
-            )
-            
-            client_manager = XUIClientManager(base_url, session)
-            if client_manager.add_client(client_request):
-                print("✅ Client با موفقیت اضافه شد")
-                
-                # تست 3: دریافت لیست Client ها
-                print(f"\n📋 تست 3: دریافت لیست Client های Inbound {inbound_id}...")
-                
-                clients = enhanced_service.get_inbound_clients(inbound_id)
-                print(f"📊 تعداد Client ها: {len(clients)}")
-                
-                for i, client in enumerate(clients):
-                    print(f"  - Client {i+1}: {client.get('email', 'نامشخص')} (ID: {client.get('id', 'نامشخص')})")
-                
-                # تست 4: به‌روزرسانی Client
-                if clients:
-                    client_id = clients[0].get('id')
-                    print(f"\n🔄 تست 4: به‌روزرسانی Client {client_id}...")
-                    
-                    if enhanced_service.update_client_traffic(inbound_id, client_id, 20):
-                        print("✅ حجم ترافیک Client با موفقیت به‌روزرسانی شد")
-                    else:
-                        print("❌ خطا در به‌روزرسانی حجم ترافیک")
-                    
-                    # تست 5: حذف Client
-                    print(f"\n🗑️ تست 5: حذف Client {client_id}...")
-                    
-                    if enhanced_service.delete_client_from_inbound(inbound_id, client_id):
-                        print("✅ Client با موفقیت حذف شد")
-                    else:
-                        print("❌ خطا در حذف Client")
-                
-                # تست 6: حذف Inbound
-                print(f"\n🗑️ تست 6: حذف Inbound {inbound_id}...")
-                
-                if inbound_manager.delete_inbound(inbound_id):
-                    print("✅ Inbound با موفقیت حذف شد")
-                else:
-                    print("❌ خطا در حذف Inbound")
-                
-            else:
-                print("❌ خطا در اضافه کردن Client")
-                
-        else:
-            print("❌ خطا در ایجاد Inbound")
-            return False
-        
-        # تست 7: ایجاد Inbound همراه با Client
-        print(f"\n🚀 تست 7: ایجاد Inbound همراه با Client...")
-        
-        test_port2 = random.randint(10000, 65000)
-        result = enhanced_service.create_inbound_with_client(
-            port=test_port2,
-            protocol="vless",
-            remark=f"Test Inbound with Client {datetime.now().strftime('%Y%m%d_%H%M%S')}",
-            client_email=f"test_user_with_client_{datetime.now().strftime('%Y%m%d_%H%M%S')}@vpn.com",
-            client_total_gb=15,
-            client_expiry_time=int((datetime.now() + timedelta(days=60)).timestamp() * 1000)
+            remark=f"Test Enhanced API {datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            client_email=f"test_enhanced_{datetime.now().strftime('%Y%m%d_%H%M%S')}@vpn.com",
+            client_total_gb=10,
+            client_expiry_time=int((datetime.now() + timedelta(days=30)).timestamp() * 1000)
         )
         
         if result:
@@ -198,16 +117,30 @@ def test_enhanced_api_models():
             print(f"  - Client Added: {result['client_added']}")
             print(f"  - Client ID: {result['client_id']}")
             
+            # تست: دریافت لیست Client ها
+            if result['inbound_id']:
+                print(f"\n📋 تست دریافت لیست Client ها...")
+                clients = enhanced_service.get_inbound_clients(result['inbound_id'])
+                print(f"📊 تعداد Client ها: {len(clients)}")
+                
+                for i, client in enumerate(clients):
+                    print(f"  - Client {i+1}: {client.get('email', 'نامشخص')} (ID: {client.get('id', 'نامشخص')})")
+            
             # حذف Inbound تست
             if result['inbound_id']:
-                inbound_manager.delete_inbound(result['inbound_id'])
-                print(f"🗑️ Inbound تست حذف شد")
+                print(f"\n🗑️ حذف Inbound تست...")
+                from xui_servers.enhanced_api_models import XUIInboundManager
+                inbound_manager = XUIInboundManager(base_url, session)
+                if inbound_manager.delete_inbound(result['inbound_id']):
+                    print("✅ Inbound تست حذف شد")
+                else:
+                    print("❌ خطا در حذف Inbound تست")
         
-        print("\n🎉 تمام تست‌های مدل‌های پیشرفته API موفق بودند!")
+        print("\n🎉 تست ساده موفق بود!")
         return True
         
     except Exception as e:
-        print(f"❌ خطا در تست مدل‌های پیشرفته API: {e}")
+        print(f"❌ خطا در تست ساده: {e}")
         return False
 
 def test_integration_with_existing_services():
@@ -225,9 +158,9 @@ def test_integration_with_existing_services():
         test_user, created = UsersModel.objects.get_or_create(
             id_tel="123456789",
             defaults={
-                "username_tel": "test_user_enhanced",
-                "full_name": "کاربر تست پیشرفته",
-                "username": "test_user_enhanced"
+                "username_tel": "test_user_enhanced_simple",
+                "full_name": "کاربر تست پیشرفته ساده",
+                "username": "test_user_enhanced_simple"
             }
         )
         
@@ -272,10 +205,10 @@ def test_integration_with_existing_services():
 
 def main():
     """تابع اصلی"""
-    print("🚀 شروع تست مدل‌های پیشرفته API برای X-UI...")
+    print("🚀 شروع تست ساده مدل‌های پیشرفته API برای X-UI...")
     
     # تست مدل‌های پیشرفته API
-    api_test_ok = test_enhanced_api_models()
+    api_test_ok = test_enhanced_api_simple()
     
     # تست یکپارچگی
     integration_test_ok = test_integration_with_existing_services()

@@ -154,3 +154,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# تنظیمات ربات ادمین
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', 'YOUR_ADMIN_BOT_TOKEN')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+ADMIN_USER_IDS = [
+    # ID های ادمین تلگرام - این‌ها را با ID های واقعی جایگزین کنید
+    # مثال: 123456789,
+]
