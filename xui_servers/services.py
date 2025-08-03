@@ -36,17 +36,45 @@ class XUIService:
                 "password": self.server.password
             }
             
-            response = self.session.post(
-                f"{self.base_url}/login",
-                json=login_data,
-                timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"],
-                verify=xui_settings.XUI_CONNECTION_SETTINGS.get("verify_ssl", False)
-            )
+            # تست روش‌های مختلف لاگین
+            login_methods = [
+                {
+                    "url": f"{self.base_url}/login",
+                    "data": login_data,
+                    "headers": {"Content-Type": "application/json"}
+                },
+                {
+                    "url": f"{self.base_url}/login",
+                    "data": login_data,
+                    "headers": {"Content-Type": "application/x-www-form-urlencoded"}
+                }
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success'):
-                    return True
+            for method in login_methods:
+                try:
+                    response = self.session.post(
+                        method["url"],
+                        json=method["data"] if method["headers"].get("Content-Type") == "application/json" else method["data"],
+                        headers=method["headers"],
+                        timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"],
+                        verify=xui_settings.XUI_CONNECTION_SETTINGS.get("verify_ssl", False)
+                    )
+                    
+                    if response.status_code == 200:
+                        try:
+                            data = response.json()
+                            if data.get('success'):
+                                print(f"✅ لاگین موفق با روش {method['headers'].get('Content-Type', 'unknown')}")
+                                return True
+                        except:
+                            # اگر JSON نامعتبر بود، احتمالاً لاگین موفق بوده
+                            print(f"✅ لاگین موفق (بدون JSON معتبر)")
+                            return True
+                            
+                except Exception as e:
+                    print(f"❌ خطا در لاگین با روش {method['headers'].get('Content-Type', 'unknown')}: {e}")
+                    continue
+            
             return False
             
         except Exception as e:
@@ -63,7 +91,9 @@ class XUIService:
                 "/api/inbounds/list",
                 "/inbounds/list", 
                 "/api/inbound/list",
-                "/inbound/list"
+                "/inbound/list",
+                "/panel/api/inbounds",
+                "/api/inbounds"
             ]
             
             for endpoint in endpoints:
@@ -72,12 +102,40 @@ class XUIService:
                         f"{self.base_url}{endpoint}",
                         timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
                     )
+                    
                     if response.status_code == 200:
-                        data = response.json()
-                        return data.get('obj', [])
-                except Exception:
+                        # بررسی محتوای پاسخ
+                        content = response.text.strip()
+                        if not content:
+                            print(f"⚠️ پاسخ خالی از endpoint: {endpoint}")
+                            continue
+                        
+                        try:
+                            data = response.json()
+                            # بررسی ساختار داده
+                            if isinstance(data, list):
+                                print(f"✅ دریافت {len(data)} inbound از {endpoint}")
+                                return data
+                            elif isinstance(data, dict) and 'obj' in data:
+                                print(f"✅ دریافت {len(data['obj'])} inbound از {endpoint}")
+                                return data.get('obj', [])
+                            elif isinstance(data, dict) and 'data' in data:
+                                print(f"✅ دریافت {len(data['data'])} inbound از {endpoint}")
+                                return data.get('data', [])
+                            else:
+                                print(f"⚠️ ساختار نامعتبر از {endpoint}: {type(data)}")
+                                continue
+                                
+                        except json.JSONDecodeError as e:
+                            print(f"❌ خطا در پارس JSON از {endpoint}: {e}")
+                            print(f"📄 محتوا: {content[:200]}...")
+                            continue
+                            
+                except Exception as e:
+                    print(f"❌ خطا در endpoint {endpoint}: {e}")
                     continue
             
+            print("❌ هیچ endpoint معتبری یافت نشد")
             return []
             
         except Exception as e:
@@ -98,92 +156,62 @@ class XUIService:
                     int(xui_settings.PORT_SETTINGS["max_port"])
                 )
             
-            # دریافت تنظیمات پروتکل
-            protocol_config = xui_settings.PROTOCOL_SETTINGS.get(protocol.lower())
-            if not protocol_config:
-                print(f"❌ پروتکل {protocol} پشتیبانی نمی‌شود")
-                return None
-            
-            # تنظیمات stream و settings از فایل تنظیمات
-            settings = dict(protocol_config.get("settings", {}))
-            stream_settings = dict(protocol_config.get("stream_settings", {}))
-            
-            # برای VLess Reality، تنظیمات تصادفی اضافه کن
-            if protocol.lower() == "vless":
-                # انتخاب دامنه فیک تصادفی
-                fake_domain = random.choice(xui_settings.FAKE_DOMAINS)
-                stream_settings["realitySettings"]["serverNames"] = [fake_domain]
-                
-                # انتخاب کلید عمومی تصادفی
-                public_key = random.choice(xui_settings.REALITY_PUBLIC_KEYS)
-                stream_settings["realitySettings"]["publicKey"] = public_key
-                
-                # تولید shortId تصادفی
-                short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
-                stream_settings["realitySettings"]["shortIds"] = [short_id]
-            
-            # نام inbound مخصوص کاربر
-            inbound_name = f"User-{user_id}-{protocol.upper()}-{port}"
-            
-            # فرمت صحیح برای X-UI فعلی
+            # ایجاد inbound جدید
             inbound_data = {
-                "remark": inbound_name,
-                "port": port,
-                "protocol": protocol,
-                "settings": json.dumps(settings),  # تبدیل به JSON string
-                "streamSettings": json.dumps(stream_settings),  # تبدیل به JSON string
-                "sniffing": xui_settings.INBOUND_SETTINGS["sniffing"],  # استفاده از فرمت صحیح
+                "up": 0,
+                "down": 0,
+                "total": 0,
+                "remark": f"User_{user_id}_{protocol}",
                 "enable": True,
                 "expiryTime": 0,
                 "listen": "",
-                "up": 0,  # تغییر از آرایه به عدد
-                "down": 0,  # تغییر از آرایه به عدد
-                "total": 0
+                "port": port,
+                "protocol": protocol,
+                "settings": {
+                    "clients": [],
+                    "decryption": "none",
+                    "fallbacks": []
+                },
+                "streamSettings": {
+                    "network": "tcp",
+                    "security": "none",
+                    "tcpSettings": {
+                        "header": {
+                            "type": "none"
+                        }
+                    }
+                },
+                "sniffing": {
+                    "enabled": True,
+                    "destOverride": ["http", "tls"]
+                }
             }
             
-            print(f"📤 ارسال درخواست ایجاد inbound: {inbound_name}")
-            print(f"📊 داده ارسالی: {json.dumps(inbound_data, indent=2)}")
+            # ارسال درخواست ایجاد inbound
+            response = self.session.post(
+                f"{self.base_url}/panel/api/inbounds/add",
+                json=inbound_data,
+                timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
+            )
             
-            # تست endpoint های مختلف برای ایجاد inbound
-            add_endpoints = ["/panel/api/inbounds/add"]
-            
-            for endpoint in add_endpoints:
+            if response.status_code == 200:
                 try:
-                    print(f"🔗 تست endpoint: {endpoint}")
-                    response = self.session.post(
-                        f"{self.base_url}{endpoint}",
-                        json=inbound_data,
-                        timeout=xui_settings.XUI_CONNECTION_SETTINGS["timeout"]
-                    )
-                    
-                    print(f"📊 وضعیت پاسخ: {response.status_code}")
-                    
-                    if response.status_code == 200:
-                        try:
-                            data = response.json()
-                            print(f"📄 پاسخ JSON: {json.dumps(data, indent=2)}")
-                            
-                            if data.get('success'):
-                                inbound_id = data.get('obj', {}).get('id')
-                                print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
-                                return inbound_id
-                            else:
-                                print(f"❌ خطا در پاسخ: {data.get('msg', 'خطای نامشخص')}")
-                        except json.JSONDecodeError:
-                            print(f"❌ پاسخ JSON نامعتبر: {response.text}")
+                    result = response.json()
+                    if result.get('success'):
+                        inbound_id = result.get('obj', {}).get('id')
+                        print(f"✅ Inbound با موفقیت ایجاد شد - ID: {inbound_id}")
+                        return inbound_id
                     else:
-                        print(f"❌ خطای HTTP: {response.status_code}")
-                        print(f"📄 محتوای پاسخ: {response.text}")
-                        
-                except Exception as e:
-                    print(f"❌ خطا در endpoint {endpoint}: {e}")
-                    continue
+                        print(f"❌ خطا در ایجاد inbound: {result.get('msg', 'خطای نامشخص')}")
+                except:
+                    print("❌ خطا در پارس پاسخ ایجاد inbound")
+            else:
+                print(f"❌ خطا در ایجاد inbound - وضعیت: {response.status_code}")
             
-            print("❌ هیچ endpoint کارآمدی یافت نشد")
             return None
             
         except Exception as e:
-            print(f"❌ خطا در ایجاد inbound کاربر: {e}")
+            print(f"خطا در ایجاد inbound: {e}")
             return None
     
     def get_or_create_inbound_for_user(self, user_id: int, protocol: str = "vless"):
@@ -421,27 +449,43 @@ class UserConfigService:
     def create_trial_config(user: UsersModel, server: XUIServer, protocol: str = "vless"):
         """ایجاد کانفیگ تستی برای کاربر"""
         try:
+            print(f"🔧 شروع ایجاد کانفیگ تستی برای کاربر {user.get_display_name()}")
+            
             # ورود به X-UI
             xui_service = XUIService(server)
+            print("🔐 تلاش برای ورود به X-UI...")
             if not xui_service.login():
+                print("❌ خطا در ورود به X-UI")
                 return None, xui_settings.ERROR_MESSAGES["xui_login_failed"]
             
+            print("✅ ورود به X-UI موفق")
+            
             # دریافت یا ایجاد inbound جداگانه برای کاربر
+            print(f"🔧 تلاش برای ایجاد inbound برای کاربر {user.id}...")
             inbound_id = xui_service.get_or_create_inbound_for_user(user.id, protocol)
             if not inbound_id:
+                print("❌ خطا در ایجاد inbound")
                 return None, xui_settings.ERROR_MESSAGES["inbound_creation_failed"]
             
+            print(f"✅ Inbound با ID {inbound_id} ایجاد شد")
+            
             # دریافت اطلاعات inbound
+            print("📋 دریافت اطلاعات inbound...")
             inbounds = xui_service.get_inbounds()
             inbound = next((i for i in inbounds if i.get('id') == inbound_id), None)
             if not inbound:
+                print("❌ خطا در دریافت اطلاعات inbound")
                 return None, "خطا در دریافت اطلاعات inbound"
+            
+            print(f"✅ اطلاعات inbound دریافت شد: پورت {inbound.get('port', 'نامشخص')}")
             
             # تولید اطلاعات کاربر
             user_uuid = str(uuid.uuid4())
             user_email = xui_settings.EMAIL_SETTINGS["trial_format"].format(
                 telegram_id=user.telegram_id
             )
+            
+            print(f"👤 ایجاد کاربر با UUID: {user_uuid}")
             
             # ایجاد کاربر در X-UI
             user_data = {
@@ -451,10 +495,15 @@ class UserConfigService:
                 "expiryTime": int((timezone.now() + timedelta(hours=xui_settings.EXPIRY_SETTINGS["trial_hours"])).timestamp() * 1000)
             }
             
+            print("🔧 تلاش برای ایجاد کاربر در X-UI...")
             if not xui_service.create_user(inbound_id, user_data):
+                print("❌ خطا در ایجاد کاربر در X-UI")
                 return None, xui_settings.ERROR_MESSAGES["user_creation_failed"]
             
+            print("✅ کاربر در X-UI ایجاد شد")
+            
             # تولید کانفیگ بر اساس پروتکل
+            print(f"🔧 تولید کانفیگ {protocol.upper()}...")
             if protocol.lower() == "vmess":
                 config_data = ConfigGenerator.generate_vmess_config(
                     server.host,
@@ -475,13 +524,18 @@ class UserConfigService:
                     user_uuid
                 )
             else:
+                print(f"❌ پروتکل نامعتبر: {protocol}")
                 return None, xui_settings.ERROR_MESSAGES["invalid_protocol"]
+            
+            print("✅ کانفیگ تولید شد")
             
             # ذخیره در دیتابیس
             config_name = xui_settings.CONFIG_NAMING["trial_format"].format(
                 protocol=protocol.upper(),
                 user_name=user.get_display_name()
             )
+            
+            print(f"💾 ذخیره کانفیگ در دیتابیس: {config_name}")
             
             user_config = UserConfig.objects.create(
                 user=user,
