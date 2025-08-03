@@ -249,14 +249,14 @@ class UserConfigAdmin(admin.ModelAdmin):
     is_expired.short_description = 'وضعیت انقضا'
     
     def get_remaining_time(self, obj):
-            remaining = obj.get_remaining_time()
+        remaining = obj.get_remaining_time()
         if remaining is None:
             return "نامحدود"
         if remaining.days > 0:
             return f"{remaining.days} روز"
         if remaining.seconds > 3600:
-                hours = remaining.seconds // 3600
-                    return f"{hours} ساعت"
+            hours = remaining.seconds // 3600
+            return f"{hours} ساعت"
         return f"{remaining.seconds // 60} دقیقه"
     get_remaining_time.short_description = 'زمان باقی‌مانده'
     
