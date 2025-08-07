@@ -8,6 +8,7 @@ import sys
 import django
 import logging
 from datetime import datetime, timedelta
+from django.utils import timezone
 
 # تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -19,7 +20,7 @@ from django.conf import settings
 from xui_servers.models import XUIServer, XUIInbound, XUIClient, UserConfig
 from accounts.models import UsersModel
 from xui_servers.services import XUIService, UserConfigService
-from xui_servers.enhanced_api_models import XUIEnhancedService
+from xui_servers.enhanced_api_models import XUIEnhancedService, XUIClientManager, XUIInboundManager, XUIAutoManager
 
 # تنظیم لاگینگ
 logging.basicConfig(
@@ -57,6 +58,10 @@ class AdminBot:
         self.application.add_handler(CommandHandler("assign_user", self.assign_user_command))
         self.application.add_handler(CommandHandler("sync_xui", self.sync_xui_command))
         
+        # دستورات پاکسازی خودکار
+        self.application.add_handler(CommandHandler("cleanup", self.cleanup_command))
+        self.application.add_handler(CommandHandler("check_expired", self.check_expired_command))
+        
         # هندلرهای callback
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         
@@ -74,12 +79,25 @@ class AdminBot:
             )
             return
         
+        # اگر کاربر ادمین است، به صورت خودکار وارد شود
+        context.user_data['logged_in'] = True
+        context.user_data['login_time'] = datetime.now()
+        
         await update.message.reply_text(
             "🔐 **ربات ادمین X-UI**\n\n"
-            "برای ورود به سیستم از دستور زیر استفاده کنید:\n"
-            "`/login [رمز عبور]`\n\n"
-            "مثال:\n"
-            "`/login admin123`",
+            "✅ **ورود خودکار موفق!**\n\n"
+            "حالا می‌توانید از دستورات زیر استفاده کنید:\n\n"
+            "📊 `/dashboard` - داشبورد کلی\n"
+            "🖥️ `/servers` - مدیریت سرورها\n"
+            "🔗 `/inbounds` - مدیریت Inbound ها\n"
+            "👤 `/clients` - مدیریت کلاینت‌ها\n"
+            "👥 `/users` - مدیریت کاربران\n"
+            "➕ `/create_inbound` - ایجاد Inbound جدید\n"
+            "🔗 `/assign_user` - تخصیص کاربر به Inbound\n"
+            "🔄 `/sync_xui` - همگام‌سازی با X-UI\n"
+            "🧹 `/cleanup` - پاکسازی خودکار\n"
+            "⏰ `/check_expired` - بررسی کاربران منقضی شده\n"
+            "🚪 `/logout` - خروج از سیستم",
             parse_mode='Markdown'
         )
     
@@ -91,23 +109,13 @@ class AdminBot:
             await update.message.reply_text("❌ شما دسترسی ادمین ندارید!")
             return
         
-        if len(context.args) < 1:
-            await update.message.reply_text(
-                "❌ لطفاً رمز عبور را وارد کنید:\n"
-                "`/login [رمز عبور]`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        password = context.args[0]
-        
-        if password == ADMIN_PASSWORD:
-            # ذخیره وضعیت لاگین
+        # اگر کاربر ادمین است و قبلاً وارد نشده، به صورت خودکار وارد شود
+        if not context.user_data.get('logged_in'):
             context.user_data['logged_in'] = True
             context.user_data['login_time'] = datetime.now()
             
             await update.message.reply_text(
-                "✅ **ورود موفق!**\n\n"
+                "✅ **ورود خودکار موفق!**\n\n"
                 "حالا می‌توانید از دستورات زیر استفاده کنید:\n\n"
                 "📊 `/dashboard` - داشبورد کلی\n"
                 "🖥️ `/servers` - مدیریت سرورها\n"
@@ -117,15 +125,19 @@ class AdminBot:
                 "➕ `/create_inbound` - ایجاد Inbound جدید\n"
                 "🔗 `/assign_user` - تخصیص کاربر به Inbound\n"
                 "🔄 `/sync_xui` - همگام‌سازی با X-UI\n"
+                "🧹 `/cleanup` - پاکسازی خودکار\n"
+                "⏰ `/check_expired` - بررسی کاربران منقضی شده\n"
                 "🚪 `/logout` - خروج از سیستم",
                 parse_mode='Markdown'
             )
-        else:
-            await update.message.reply_text(
-                "❌ **رمز عبور نامعتبر!**\n\n"
-                "لطفاً رمز عبور صحیح را وارد کنید.",
-                parse_mode='Markdown'
-            )
+            return
+        
+        # اگر کاربر قبلاً وارد شده، پیام مناسب نمایش دهد
+        await update.message.reply_text(
+            "✅ **شما قبلاً وارد شده‌اید!**\n\n"
+            "برای خروج از سیستم از دستور `/logout` استفاده کنید.",
+            parse_mode='Markdown'
+        )
     
     async def logout_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """دستور خروج"""
@@ -147,7 +159,7 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
@@ -157,6 +169,12 @@ class AdminBot:
             clients_count = XUIClient.objects.filter(is_active=True).count()
             users_count = UsersModel.objects.count()
             configs_count = UserConfig.objects.filter(is_active=True).count()
+            
+            # آمار کاربران منقضی شده
+            expired_configs = UserConfig.objects.filter(
+                is_active=True,
+                expires_at__lt=timezone.now()
+            ).count()
             
             # آمار سرورها
             server_stats = []
@@ -173,7 +191,8 @@ class AdminBot:
                 f"🔗 **Inbound ها:** {inbounds_count}\n"
                 f"👤 **کلاینت‌ها:** {clients_count}\n"
                 f"👥 **کاربران:** {users_count}\n"
-                f"📋 **کانفیگ‌ها:** {configs_count}\n\n"
+                f"📋 **کانفیگ‌ها:** {configs_count}\n"
+                f"⏰ **منقضی شده:** {expired_configs}\n\n"
                 f"📈 **آمار سرورها:**\n{stats_text}",
                 parse_mode='Markdown'
             )
@@ -190,7 +209,7 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
@@ -231,7 +250,7 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
@@ -272,28 +291,30 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
-            clients = XUIClient.objects.filter(is_active=True)[:10]  # فقط 10 مورد اول
+            clients = XUIClient.objects.filter(is_active=True)
             
             if not clients.exists():
                 await update.message.reply_text("❌ هیچ کلاینت فعالی یافت نشد!")
                 return
             
-            message = "👤 **لیست کلاینت‌ها (10 مورد اول):**\n\n"
+            message = "👤 **لیست کلاینت‌ها:**\n\n"
             
             for client in clients:
                 remaining_gb = client.get_remaining_gb()
                 expiry_status = "منقضی شده" if client.is_expired() else "فعال"
+                status = "🟢 فعال" if client.is_active else "🔴 غیرفعال"
                 
                 message += (
                     f"**{client.email}**\n"
                     f"👤 کاربر: {client.user.full_name}\n"
                     f"🔗 Inbound: {client.inbound.remark}\n"
-                    f"📊 حجم: {remaining_gb} GB باقی‌مانده\n"
-                    f"⏰ انقضا: {expiry_status}\n\n"
+                    f"📊 حجم باقی‌مانده: {remaining_gb} GB\n"
+                    f"⏰ وضعیت انقضا: {expiry_status}\n"
+                    f"🔧 {status}\n\n"
                 )
             
             await update.message.reply_text(message, parse_mode='Markdown')
@@ -310,27 +331,29 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
-            users = UsersModel.objects.all()[:10]  # فقط 10 مورد اول
+            users = UsersModel.objects.all()
             
             if not users.exists():
                 await update.message.reply_text("❌ هیچ کاربری یافت نشد!")
                 return
             
-            message = "👥 **لیست کاربران (10 مورد اول):**\n\n"
+            message = "👥 **لیست کاربران:**\n\n"
             
             for user in users:
                 configs_count = user.xui_configs.filter(is_active=True).count()
-                clients_count = user.xui_clients.filter(is_active=True).count()
+                trial_status = "✅ استفاده شده" if user.has_used_trial else "❌ استفاده نشده"
+                status = "🟢 فعال" if user.is_active else "🔴 غیرفعال"
                 
                 message += (
                     f"**{user.full_name}**\n"
-                    f"📱 تلگرام: @{user.username_tel}\n"
+                    f"🆔 ID تلگرام: {user.telegram_id or 'نامشخص'}\n"
                     f"📋 کانفیگ‌ها: {configs_count}\n"
-                    f"👤 کلاینت‌ها: {clients_count}\n\n"
+                    f"🎁 پلن تستی: {trial_status}\n"
+                    f"🔧 {status}\n\n"
                 )
             
             await update.message.reply_text(message, parse_mode='Markdown')
@@ -347,101 +370,15 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
-        if len(context.args) < 4:
-            await update.message.reply_text(
-                "❌ لطفاً پارامترهای مورد نیاز را وارد کنید:\n"
-                "`/create_inbound [سرور] [پورت] [پروتکل] [نام]`\n\n"
-                "مثال:\n"
-                "`/create_inbound سرور1 12345 vless Test Inbound`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        try:
-            server_name = context.args[0]
-            port = int(context.args[1])
-            protocol = context.args[2]
-            remark = " ".join(context.args[3:])
-            
-            # یافتن سرور
-            server = XUIServer.objects.filter(name=server_name, is_active=True).first()
-            if not server:
-                await update.message.reply_text(f"❌ سرور '{server_name}' یافت نشد!")
-                return
-            
-            # بررسی تکراری نبودن پورت
-            if XUIInbound.objects.filter(server=server, port=port).exists():
-                await update.message.reply_text(f"❌ پورت {port} در سرور {server_name} قبلاً استفاده شده!")
-                return
-            
-            # ایجاد Inbound در X-UI
-            xui_service = XUIService(server)
-            if not xui_service.login():
-                await update.message.reply_text(f"❌ خطا در ورود به سرور {server_name}!")
-                return
-            
-            # ایجاد Inbound با استفاده از مدل‌های پیشرفته
-            from xui_servers.enhanced_api_models import XUIInboundCreationRequest, XUIInboundManager
-            import requests
-            
-            session = requests.Session()
-            base_url = server.get_full_url()
-            
-            # لاگین
-            login_data = {
-                "username": server.username,
-                "password": server.password
-            }
-            
-            response = session.post(
-                f"{base_url}/login",
-                json=login_data,
-                headers={'Content-Type': 'application/json'},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                inbound_request = XUIInboundCreationRequest(
-                    port=port,
-                    protocol=protocol,
-                    remark=remark
-                )
-                
-                inbound_manager = XUIInboundManager(base_url, session)
-                inbound_id = inbound_manager.create_inbound(inbound_request)
-                
-                if inbound_id:
-                    # ایجاد رکورد در دیتابیس
-                    XUIInbound.objects.create(
-                        server=server,
-                        xui_inbound_id=inbound_id,
-                        port=port,
-                        protocol=protocol,
-                        remark=remark,
-                        is_active=True
-                    )
-                    
-                    await update.message.reply_text(
-                        f"✅ **Inbound جدید ایجاد شد!**\n\n"
-                        f"📝 نام: {remark}\n"
-                        f"🖥️ سرور: {server_name}\n"
-                        f"🔌 پورت: {port}\n"
-                        f"📡 پروتکل: {protocol}\n"
-                        f"🆔 ID: {inbound_id}",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await update.message.reply_text("❌ خطا در ایجاد Inbound در X-UI!")
-            else:
-                await update.message.reply_text("❌ خطا در ورود به X-UI!")
-                
-        except ValueError:
-            await update.message.reply_text("❌ پورت باید عدد باشد!")
-        except Exception as e:
-            await update.message.reply_text(f"❌ خطا در ایجاد Inbound: {e}")
+        await update.message.reply_text(
+            "🔄 **ایجاد Inbound جدید**\n\n"
+            "این قابلیت در حال توسعه است...\n\n"
+            "💡 **نکته:** شما می‌توانید Inbound ها را مستقیماً در X-UI ایجاد کنید و سپس با دستور `/sync_xui` آن‌ها را همگام‌سازی کنید.",
+            parse_mode='Markdown'
+        )
     
     async def assign_user_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """تخصیص کاربر به Inbound"""
@@ -452,101 +389,15 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
-        if len(context.args) < 2:
-            await update.message.reply_text(
-                "❌ لطفاً پارامترهای مورد نیاز را وارد کنید:\n"
-                "`/assign_user [شناسه کاربر] [شناسه Inbound]`\n\n"
-                "مثال:\n"
-                "`/assign_user 123456789 1`",
-                parse_mode='Markdown'
-            )
-            return
-        
-        try:
-            user_tel_id = context.args[0]
-            inbound_id = int(context.args[1])
-            
-            # یافتن کاربر
-            user = UsersModel.objects.filter(id_tel=user_tel_id).first()
-            if not user:
-                await update.message.reply_text(f"❌ کاربر با شناسه {user_tel_id} یافت نشد!")
-                return
-            
-            # یافتن Inbound
-            inbound = XUIInbound.objects.filter(id=inbound_id, is_active=True).first()
-            if not inbound:
-                await update.message.reply_text(f"❌ Inbound با شناسه {inbound_id} یافت نشد!")
-                return
-            
-            # بررسی ظرفیت Inbound
-            if not inbound.can_accept_client():
-                await update.message.reply_text(f"❌ Inbound {inbound.remark} ظرفیت ندارد!")
-                return
-            
-            # ایجاد کلاینت در X-UI
-            from xui_servers.enhanced_api_models import XUIClientCreationRequest, XUIClientManager
-            import requests
-            
-            session = requests.Session()
-            base_url = inbound.server.get_full_url()
-            
-            # لاگین
-            login_data = {
-                "username": inbound.server.username,
-                "password": inbound.server.password
-            }
-            
-            response = session.post(
-                f"{base_url}/login",
-                json=login_data,
-                headers={'Content-Type': 'application/json'},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                client_request = XUIClientCreationRequest(
-                    inbound_id=inbound.xui_inbound_id,
-                    email=f"{user.username_tel}@vpn.com",
-                    total_gb=0,  # نامحدود
-                    expiry_time=0  # نامحدود
-                )
-                
-                client_manager = XUIClientManager(base_url, session)
-                if client_manager.add_client(client_request):
-                    # ایجاد رکورد کلاینت
-                    client = XUIClient.objects.create(
-                        inbound=inbound,
-                        user=user,
-                        xui_client_id=client_request.to_payload()["settings"]["clients"][0]["id"],
-                        email=client_request.email,
-                        total_gb=0,
-                        expiry_time=0
-                    )
-                    
-                    # به‌روزرسانی تعداد کلاینت‌ها
-                    inbound.current_clients += 1
-                    inbound.save()
-                    
-                    await update.message.reply_text(
-                        f"✅ **کاربر با موفقیت تخصیص داده شد!**\n\n"
-                        f"👤 کاربر: {user.full_name}\n"
-                        f"🔗 Inbound: {inbound.remark}\n"
-                        f"📧 ایمیل: {client.email}\n"
-                        f"🆔 کلاینت ID: {client.xui_client_id}",
-                        parse_mode='Markdown'
-                    )
-                else:
-                    await update.message.reply_text("❌ خطا در ایجاد کلاینت در X-UI!")
-            else:
-                await update.message.reply_text("❌ خطا در ورود به X-UI!")
-                
-        except ValueError:
-            await update.message.reply_text("❌ شناسه Inbound باید عدد باشد!")
-        except Exception as e:
-            await update.message.reply_text(f"❌ خطا در تخصیص کاربر: {e}")
+        await update.message.reply_text(
+            "🔄 **تخصیص کاربر به Inbound**\n\n"
+            "این قابلیت در حال توسعه است...\n\n"
+            "💡 **نکته:** کاربران به صورت خودکار به بهترین Inbound موجود تخصیص داده می‌شوند.",
+            parse_mode='Markdown'
+        )
     
     async def sync_xui_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """همگام‌سازی با X-UI"""
@@ -557,61 +408,141 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         try:
-            await update.message.reply_text("🔄 در حال همگام‌سازی با X-UI...")
+            await update.message.reply_text("🔄 **شروع همگام‌سازی با X-UI...**")
             
-            synced_count = 0
-            error_count = 0
-            
+            total_synced = 0
             for server in XUIServer.objects.filter(is_active=True):
                 try:
-                    xui_service = XUIService(server)
-                    if xui_service.login():
-                        # همگام‌سازی Inbound ها
-                        inbounds = xui_service.get_inbounds()
-                        for xui_inbound in inbounds:
-                            inbound, created = XUIInbound.objects.get_or_create(
-                                server=server,
-                                xui_inbound_id=xui_inbound.get('id'),
-                                defaults={
-                                    'port': xui_inbound.get('port'),
-                                    'protocol': xui_inbound.get('protocol'),
-                                    'remark': xui_inbound.get('remark'),
-                                    'is_active': True
-                                }
-                            )
-                            
-                            if not created:
-                                # به‌روزرسانی اطلاعات موجود
-                                inbound.port = xui_inbound.get('port', inbound.port)
-                                inbound.remark = xui_inbound.get('remark', inbound.remark)
-                                inbound.protocol = xui_inbound.get('protocol', inbound.protocol)
-                                inbound.save()
-                            
-                            synced_count += 1
+                    enhanced_service = XUIEnhancedService(server)
+                    synced_count = enhanced_service.sync_inbounds_to_database()
+                    total_synced += synced_count
+                    
+                    await update.message.reply_text(
+                        f"✅ سرور {server.name}: {synced_count} inbound همگام‌سازی شد"
+                    )
+                    
                 except Exception as e:
-                    error_count += 1
-                    logger.error(f"خطا در همگام‌سازی سرور {server.name}: {e}")
+                    await update.message.reply_text(
+                        f"❌ خطا در همگام‌سازی سرور {server.name}: {e}"
+                    )
             
             await update.message.reply_text(
                 f"✅ **همگام‌سازی کامل شد!**\n\n"
-                f"📊 تعداد همگام‌سازی شده: {synced_count}\n"
-                f"❌ تعداد خطا: {error_count}",
+                f"📊 تعداد کل inbound های همگام‌سازی شده: {total_synced}",
                 parse_mode='Markdown'
             )
             
         except Exception as e:
             await update.message.reply_text(f"❌ خطا در همگام‌سازی: {e}")
     
+    async def cleanup_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """پاکسازی خودکار"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ شما دسترسی ادمین ندارید!")
+            return
+        
+        if not context.user_data.get('logged_in'):
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
+            return
+        
+        try:
+            await update.message.reply_text("🧹 **شروع پاکسازی خودکار...**")
+            
+            total_cleaned = 0
+            for server in XUIServer.objects.filter(is_active=True):
+                try:
+                    auto_manager = XUIAutoManager(server)
+                    results = auto_manager.run_cleanup()
+                    
+                    if results['total_cleaned'] > 0:
+                        await update.message.reply_text(
+                            f"✅ سرور {server.name}:\n"
+                            f"  • کاربران منقضی شده: {results['expired_users']}\n"
+                            f"  • محدودیت ترافیک: {results['traffic_exceeded']}\n"
+                            f"  • کل پاکسازی شده: {results['total_cleaned']}"
+                        )
+                        total_cleaned += results['total_cleaned']
+                    
+                except Exception as e:
+                    await update.message.reply_text(
+                        f"❌ خطا در پاکسازی سرور {server.name}: {e}"
+                    )
+            
+            if total_cleaned > 0:
+                await update.message.reply_text(
+                    f"✅ **پاکسازی خودکار کامل شد!**\n\n"
+                    f"📊 تعداد کل پاکسازی شده: {total_cleaned}",
+                    parse_mode='Markdown'
+                )
+            else:
+                await update.message.reply_text(
+                    "✅ **پاکسازی خودکار کامل شد!**\n\n"
+                    "📊 هیچ کاربری برای پاکسازی یافت نشد.",
+                    parse_mode='Markdown'
+                )
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ خطا در پاکسازی خودکار: {e}")
+    
+    async def check_expired_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """بررسی کاربران منقضی شده"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ شما دسترسی ادمین ندارید!")
+            return
+        
+        if not context.user_data.get('logged_in'):
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
+            return
+        
+        try:
+            # بررسی کانفیگ‌های منقضی شده
+            expired_configs = UserConfig.objects.filter(
+                is_active=True,
+                expires_at__lt=timezone.now()
+            )
+            
+            if not expired_configs.exists():
+                await update.message.reply_text(
+                    "✅ **بررسی کاربران منقضی شده**\n\n"
+                    "📊 هیچ کانفیگ منقضی شده‌ای یافت نشد.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            message = "⏰ **کانفیگ‌های منقضی شده:**\n\n"
+            
+            for config in expired_configs[:10]:  # فقط 10 مورد اول
+                days_expired = (timezone.now() - config.expires_at).days
+                message += (
+                    f"**{config.config_name}**\n"
+                    f"👤 کاربر: {config.user.full_name}\n"
+                    f"🖥️ سرور: {config.server.name}\n"
+                    f"📅 منقضی شده: {days_expired} روز پیش\n\n"
+                )
+            
+            if expired_configs.count() > 10:
+                message += f"... و {expired_configs.count() - 10} مورد دیگر\n\n"
+            
+            message += f"💡 برای پاکسازی از دستور `/cleanup` استفاده کنید."
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ خطا در بررسی کاربران منقضی شده: {e}")
+    
     async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """پاسخ به دکمه‌های inline"""
+        """پردازش callback دکمه‌ها"""
         query = update.callback_query
         await query.answer()
         
-        # پردازش callback data
         data = query.data
         
         if data.startswith('server_'):
@@ -649,7 +580,7 @@ class AdminBot:
             await query.edit_message_text("❌ سرور یافت نشد!")
     
     async def handle_inbound_callback(self, query, context, data):
-        """پردازش callback Inbound"""
+        """پردازش callback inbound"""
         inbound_id = data.split('_')[1]
         action = data.split('_')[2]
         
@@ -709,7 +640,7 @@ class AdminBot:
             return
         
         if not context.user_data.get('logged_in'):
-            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login [رمز عبور]`", parse_mode='Markdown')
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
             return
         
         # پردازش پیام‌های متنی
@@ -718,7 +649,7 @@ class AdminBot:
         if text.lower() in ['help', 'راهنما', 'کمک']:
             await update.message.reply_text(
                 "📚 **راهنمای دستورات ادمین:**\n\n"
-                "🔐 `/login [رمز]` - ورود به سیستم\n"
+                "🔐 `/login` - ورود خودکار به سیستم\n"
                 "🚪 `/logout` - خروج از سیستم\n"
                 "📊 `/dashboard` - داشبورد کلی\n"
                 "🖥️ `/servers` - مدیریت سرورها\n"
@@ -727,7 +658,10 @@ class AdminBot:
                 "👥 `/users` - مدیریت کاربران\n"
                 "➕ `/create_inbound` - ایجاد Inbound جدید\n"
                 "🔗 `/assign_user` - تخصیص کاربر به Inbound\n"
-                "🔄 `/sync_xui` - همگام‌سازی با X-UI",
+                "🔄 `/sync_xui` - همگام‌سازی با X-UI\n"
+                "🧹 `/cleanup` - پاکسازی خودکار\n"
+                "⏰ `/check_expired` - بررسی کاربران منقضی شده\n\n"
+                "💡 **نکته:** کاربران ادمین به صورت خودکار وارد می‌شوند و نیازی به رمز عبور ندارند.",
                 parse_mode='Markdown'
             )
         else:

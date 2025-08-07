@@ -1,120 +1,185 @@
 #!/usr/bin/env python3
 """
-تست API های X-UI
+تست API جدید X-UI
 """
 
+import os
+import sys
+import django
 import requests
 import json
+from datetime import datetime
 
-def test_xui_api():
-    """تست API های X-UI"""
+# تنظیم Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from xui_servers.models import XUIServer
+from xui_servers.enhanced_api_models import XUIEnhancedService, XUIClientManager, XUIInboundManager
+
+def test_xui_connection():
+    """تست اتصال به X-UI"""
+    print("🔧 تست اتصال به X-UI...")
     
-    # تنظیمات سرور
-    base_url = "http://38.54.105.124:54321/MsxZ4xuIy5xLfQtsSC"
+    # یافتن سرور فعال
+    server = XUIServer.objects.filter(is_active=True).first()
+    if not server:
+        print("❌ هیچ سرور فعالی یافت نشد!")
+        return False
     
-    # ایجاد session
-    session = requests.Session()
-    session.headers.update({
-        'Content-Type': 'application/json',
-        'User-Agent': 'Django-XUI-Bot/2.0'
+    print(f"🖥️ سرور: {server.name} ({server.host}:{server.port})")
+    
+    # تست سرویس پیشرفته
+    enhanced_service = XUIEnhancedService(server)
+    
+    # تست لاگین
+    print("🔐 تلاش برای ورود...")
+    if enhanced_service.login():
+        print("✅ ورود موفق!")
+    else:
+        print("❌ خطا در ورود!")
+        return False
+    
+    # تست دریافت inbound ها
+    print("📋 دریافت inbound ها...")
+    inbounds = enhanced_service.get_inbounds()
+    print(f"✅ {len(inbounds)} inbound دریافت شد")
+    
+    for inbound in inbounds:
+        print(f"  • {inbound.get('remark', 'نامشخص')} (پورت: {inbound.get('port', 'نامشخص')})")
+    
+    return True
+
+def test_client_creation():
+    """تست ایجاد کلاینت"""
+    print("\n👤 تست ایجاد کلاینت...")
+    
+    server = XUIServer.objects.filter(is_active=True).first()
+    if not server:
+        print("❌ هیچ سرور فعالی یافت نشد!")
+        return False
+    
+    enhanced_service = XUIEnhancedService(server)
+    
+    # لاگین
+    if not enhanced_service.login():
+        print("❌ خطا در ورود!")
+        return False
+    
+    # دریافت inbound ها
+    inbounds = enhanced_service.get_inbounds()
+    if not inbounds:
+        print("❌ هیچ inbound یافت نشد!")
+        return False
+    
+    # انتخاب اولین inbound
+    inbound = inbounds[0]
+    inbound_id = inbound.get('id')
+    
+    print(f"🔗 انتخاب inbound: {inbound.get('remark')} (ID: {inbound_id})")
+    
+    # ایجاد تنظیمات کلاینت تستی
+    client_settings = enhanced_service.create_client_settings(
+        email="test_user_123",
+        total_gb=1,
+        expiry_days=1
+    )
+    
+    print("🔧 تنظیمات کلاینت ایجاد شد:")
+    print(json.dumps(client_settings, indent=2, ensure_ascii=False))
+    
+    # اضافه کردن کلاینت
+    print("➕ اضافه کردن کلاینت به inbound...")
+    if enhanced_service.add_client_to_inbound(inbound_id, client_settings):
+        print("✅ کلاینت با موفقیت اضافه شد!")
+        return True
+    else:
+        print("❌ خطا در اضافه کردن کلاینت!")
+        return False
+
+def test_inbound_manager():
+    """تست مدیر inbound"""
+    print("\n🔗 تست مدیر inbound...")
+    
+    server = XUIServer.objects.filter(is_active=True).first()
+    if not server:
+        print("❌ هیچ سرور فعالی یافت نشد!")
+        return False
+    
+    inbound_manager = XUIInboundManager(server)
+    
+    # همگام‌سازی inbound ها
+    print("🔄 همگام‌سازی inbound ها...")
+    synced_count = inbound_manager.sync_inbounds()
+    print(f"✅ {synced_count} inbound همگام‌سازی شد")
+    
+    # یافتن inbound مناسب
+    print("🔍 یافتن inbound مناسب...")
+    best_inbound = inbound_manager.find_best_inbound("vless")
+    if best_inbound:
+        print(f"✅ بهترین inbound: {best_inbound.remark} (پورت: {best_inbound.port})")
+    else:
+        print("❌ هیچ inbound مناسبی یافت نشد!")
+    
+    return True
+
+def test_client_manager():
+    """تست مدیر کلاینت"""
+    print("\n👤 تست مدیر کلاینت...")
+    
+    server = XUIServer.objects.filter(is_active=True).first()
+    if not server:
+        print("❌ هیچ سرور فعالی یافت نشد!")
+        return False
+    
+    client_manager = XUIClientManager(server)
+    
+    # یافتن inbound مناسب
+    inbound_manager = XUIInboundManager(server)
+    inbound = inbound_manager.find_best_inbound("vless")
+    
+    if not inbound:
+        print("❌ هیچ inbound مناسبی یافت نشد!")
+        return False
+    
+    print(f"🔗 استفاده از inbound: {inbound.remark}")
+    
+    # تست تولید کانفیگ
+    print("🔧 تست تولید کانفیگ...")
+    config_data = client_manager._generate_config_data(inbound, {
+        "id": "test-uuid-123",
+        "email": "test@example.com"
     })
     
-    print("🔍 تست API های X-UI...")
-    print(f"🌐 URL پایه: {base_url}")
+    print(f"✅ کانفیگ تولید شد: {config_data[:100]}...")
     
-    # تست ورود
-    print("\n🔐 تست ورود...")
-    login_data = {
-        "username": "admin",
-        "password": "YourSecurePassword123!@#"
-    }
+    return True
+
+def main():
+    """تابع اصلی"""
+    print("🚀 شروع تست API جدید X-UI")
+    print("=" * 50)
     
-    try:
-        response = session.post(f"{base_url}/login", json=login_data, timeout=10)
-        print(f"📊 وضعیت ورود: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"📄 پاسخ ورود: {json.dumps(data, indent=2)}")
-            
-            if data.get('success'):
-                print("✅ ورود موفق")
-                
-                # تست دریافت inbound ها
-                print("\n📋 تست دریافت inbound ها...")
-                list_endpoints = [
-                    "/api/inbounds/list",
-                    "/inbounds/list",
-                    "/api/inbound/list",
-                    "/inbound/list"
-                ]
-                
-                for endpoint in list_endpoints:
-                    try:
-                        response = session.get(f"{base_url}{endpoint}", timeout=10)
-                        print(f"  {endpoint}: {response.status_code}")
-                        
-                        if response.status_code == 200:
-                            data = response.json()
-                            print(f"    پاسخ: {json.dumps(data, indent=2)}")
-                            break
-                    except Exception as e:
-                        print(f"  {endpoint}: خطا - {e}")
-                
-                # تست ایجاد inbound ساده
-                print("\n🔧 تست ایجاد inbound...")
-                test_inbound = {
-                    "remark": "API-Test",
-                    "port": 8445,
-                    "protocol": "vmess",
-                    "settings": {
-                        "clients": []
-                    },
-                    "streamSettings": {
-                        "network": "tcp",
-                        "security": "none"
-                    },
-                    "sniffing": {
-                        "enabled": True,
-                        "destOverride": ["http", "tls"]
-                    }
-                }
-                
-                add_endpoints = [
-                    "/api/inbounds/add",
-                    "/inbounds/add",
-                    "/api/inbound/add",
-                    "/inbound/add"
-                ]
-                
-                for endpoint in add_endpoints:
-                    try:
-                        print(f"  تست {endpoint}...")
-                        response = session.post(f"{base_url}{endpoint}", json=test_inbound, timeout=10)
-                        print(f"    وضعیت: {response.status_code}")
-                        
-                        if response.status_code == 200:
-                            data = response.json()
-                            print(f"    پاسخ: {json.dumps(data, indent=2)}")
-                            
-                            if data.get('success'):
-                                print("✅ Inbound با موفقیت ایجاد شد!")
-                                break
-                            else:
-                                print(f"❌ خطا: {data.get('msg', 'خطای نامشخص')}")
-                        else:
-                            print(f"    خطا: {response.text}")
-                            
-                    except Exception as e:
-                        print(f"    خطا: {e}")
-            else:
-                print("❌ خطا در ورود")
-        else:
-            print(f"❌ خطای HTTP: {response.status_code}")
-            print(f"📄 محتوای پاسخ: {response.text}")
-            
-    except Exception as e:
-        print(f"❌ خطا در اتصال: {e}")
+    # تست اتصال
+    if not test_xui_connection():
+        print("❌ تست اتصال ناموفق!")
+        return
+    
+    # تست مدیر inbound
+    if not test_inbound_manager():
+        print("❌ تست مدیر inbound ناموفق!")
+        return
+    
+    # تست مدیر کلاینت
+    if not test_client_manager():
+        print("❌ تست مدیر کلاینت ناموفق!")
+        return
+    
+    # تست ایجاد کلاینت (اختیاری)
+    print("\n⚠️ تست ایجاد کلاینت (اختیاری)...")
+    test_client_creation()
+    
+    print("\n✅ تمام تست‌ها با موفقیت انجام شد!")
 
 if __name__ == "__main__":
-    test_xui_api() 
+    main() 

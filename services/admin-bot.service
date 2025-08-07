@@ -1,0 +1,43 @@
+[Unit]
+Description=Telegram Admin Bot Service
+After=network.target
+Wants=network.target
+Requires=django.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/vpnbot
+Environment=PATH=/opt/vpnbot/venv/bin
+Environment=DJANGO_SETTINGS_MODULE=config.settings
+Environment=PYTHONPATH=/opt/vpnbot
+ExecStart=/opt/vpnbot/venv/bin/python bot/admin_bot.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=admin-bot
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vpnbot/logs /opt/vpnbot/media
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=2048
+MemoryMax=512M
+CPUQuota=30%
+
+# Logging
+LogLevelMax=info
+
+[Install]
+WantedBy=multi-user.target 

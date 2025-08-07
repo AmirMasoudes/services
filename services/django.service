@@ -1,0 +1,41 @@
+[Unit]
+Description=Django VPN Bot Web Server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/vpnbot
+Environment=PATH=/opt/vpnbot/venv/bin
+Environment=DJANGO_SETTINGS_MODULE=config.settings
+ExecStart=/opt/vpnbot/venv/bin/python manage.py runserver 0.0.0.0:8000
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=django-vpnbot
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vpnbot/media /opt/vpnbot/staticfiles /opt/vpnbot/logs /opt/vpnbot/backups
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=1G
+CPUQuota=50%
+
+# Logging
+LogLevelMax=info
+
+[Install]
+WantedBy=multi-user.target 

@@ -546,7 +546,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطا در دریافت پروفایل: {e}")
         await update.message.reply_text("❌ خطا در دریافت اطلاعات پروفایل.")
 
-# پلن تستی - بهبود شده با X-UI
+# پلن تستی - بهبود شده با X-UI سنایی
 async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = update.effective_user.id
     try:
@@ -573,94 +573,57 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # انتخاب اولین سرور فعال
         server = active_servers[0]
         
-        # ایجاد کانفیگ تستی با استفاده از کانفیگ‌های موجود
+        # استفاده از سرویس X-UI برای ایجاد کانفیگ تستی
         try:
-            # استفاده از کانفیگ موجود که کار می‌کند
-            existing_config = await sync_to_async(UserConfig.objects.filter(is_trial=True).first)()
+            from xui_servers.enhanced_api_models import XUIClientManager, XUIInboundManager
             
-            if existing_config:
-                # کپی کردن کانفیگ موجود و تغییر UUID
-                import uuid
-                import re
-                
-                # تولید UUID جدید
-                new_uuid = str(uuid.uuid4())
-                
-                # جایگزینی UUID در کانفیگ
-                old_uuid_pattern = r'vless://([a-f0-9-]+)@'
-                config_data = re.sub(old_uuid_pattern, f'vless://{new_uuid}@', existing_config.config_data)
-                
-                # ایجاد کانفیگ جدید
-                user_config = await sync_to_async(UserConfig.objects.create)(
-                    user=user,
-                    server=server,
-                    xui_inbound_id=existing_config.xui_inbound_id,
-                    xui_user_id=new_uuid,
-                    config_name=f"پلن تستی {user.full_name} (VLESS)",
-                    config_data=config_data,
-                    protocol="vless",
-                    is_trial=True,
-                    expires_at=timezone.now() + timedelta(hours=24)
+            # یافتن inbound مناسب
+            inbound_manager = XUIInboundManager(server)
+            inbound = inbound_manager.find_best_inbound("vless")
+            
+            if not inbound:
+                await update.message.reply_text(
+                    "❌ **هیچ inbound مناسبی یافت نشد.**\n\n"
+                    "لطفا با ادمین تماس بگیرید.",
+                    parse_mode='Markdown'
                 )
+                return
+            
+            # ایجاد کانفیگ تستی با X-UI
+            client_manager = XUIClientManager(server)
+            user_config = await sync_to_async(client_manager.create_trial_config)(user, inbound)
+            
+            if user_config:
+                # علامت‌گذاری استفاده از پلن تستی
+                await sync_to_async(user.mark_trial_used)()
                 
-                message = "کانفیگ تستی با موفقیت ایجاد شد (با استفاده از کانفیگ موجود)"
+                await update.message.reply_text(
+                    f"🎉 **پلن تستی شما فعال شد!**\n\n"
+                    f"📋 **نام:** پلن تستی\n"
+                    f"⏰ **اعتبار:** 24 ساعت\n"
+                    f"📊 **حجم:** 1 GB\n"
+                    f"🖥️ **سرور:** {server.name}\n"
+                    f"🔧 **پروتکل:** VLESS\n\n"
+                    f"🔧 **کانفیگ شما:**\n"
+                    f"`{user_config.config_data}`\n\n"
+                    f"⚠️ **نکات مهم:**\n"
+                    f"• این پلن فقط یک بار قابل استفاده است\n"
+                    f"• پس از 24 ساعت منقضی می‌شود\n"
+                    f"• برای استفاده مداوم، پلن پولی خریداری کنید",
+                    parse_mode='Markdown',
+                    reply_markup=main_keyboard
+                )
             else:
-                # اگر کانفیگ موجود نباشد، کانفیگ ساده ایجاد کنیم
-                raise Exception("هیچ کانفیگ موجودی یافت نشد")
-            
-        except Exception as e:
-            # در صورت خطا، کانفیگ ساده ایجاد کنیم
-            from xui_servers.models import UserConfig
-            import uuid
-            import random
-            import string
-            
-            # تولید کانفیگ VLess
-            user_uuid = str(uuid.uuid4())
-            fake_domain = random.choice(["www.aparat.com", "www.irib.ir", "www.varzesh3.com"])
-            public_key = random.choice(["H5jCG+N2boOAvWRFcntZJsSFCMn6xMOa1NfU+KR3Cw=", "K8mFJ+Q5erRDwZUIfqubmvuIFPq9APzd/1QmF+NU6Fz="])
-            short_id = ''.join(random.choices(string.hexdigits.lower(), k=8))
-            port = random.randint(10000, 65000)
-            
-            config_data = f"vless://{user_uuid}@{server.host}:{port}?type=tcp&security=reality&sni={fake_domain}&fp=chrome&pbk={public_key}&sid={short_id}&spx=%2F#{user.full_name}"
-            
-            # ایجاد کانفیگ در دیتابیس
-            user_config = await sync_to_async(UserConfig.objects.create)(
-                user=user,
-                server=server,
-                xui_inbound_id=0,  # بدون X-UI
-                xui_user_id=str(user.telegram_id) if user.telegram_id else str(user.id),
-                config_name=f"پلن تستی {user.full_name} (VLESS)",
-                config_data=config_data,
-                protocol="vless",
-                is_trial=True,
-                expires_at=timezone.now() + timedelta(hours=24)
-            )
-            
-            message = f"کانفیگ تستی با موفقیت ایجاد شد (بدون X-UI) - خطا: {e}"
+                await update.message.reply_text(
+                    "❌ **خطا در ایجاد کانفیگ تستی در X-UI.**\n\n"
+                    "لطفا با ادمین تماس بگیرید.",
+                    parse_mode='Markdown'
+                )
         
-        if user_config:
-            # علامت‌گذاری استفاده از پلن تستی
-            await sync_to_async(user.mark_trial_used)()
-            
+        except Exception as e:
+            logger.error(f"خطا در ایجاد کانفیگ تستی: {e}")
             await update.message.reply_text(
-                f"🎉 **پلن تستی شما فعال شد!**\n\n"
-                f"📋 **نام:** پلن تستی\n"
-                f"⏰ **اعتبار:** 24 ساعت\n"
-                f"📊 **حجم:** نامحدود\n"
-                f"🖥️ **سرور:** {server.name}\n\n"
-                f"🔧 **کانفیگ شما:**\n"
-                f"`{user_config.config_data}`\n\n"
-                f"⚠️ **نکات مهم:**\n"
-                f"• این پلن فقط یک بار قابل استفاده است\n"
-                f"• پس از 24 ساعت منقضی می‌شود\n"
-                f"• برای استفاده مداوم، پلن پولی خریداری کنید",
-                parse_mode='Markdown',
-                reply_markup=main_keyboard
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ **خطا در ایجاد کانفیگ تستی:**\n\n{message}",
+                f"❌ **خطا در ایجاد کانفیگ تستی:**\n\n{str(e)}",
                 parse_mode='Markdown'
             )
         
@@ -760,7 +723,7 @@ async def handle_plan_selection(update: Update, context: ContextTypes.DEFAULT_TY
         logger.error(f"خطا در انتخاب پلن: {e}")
         await query.edit_message_text("❌ خطا در انتخاب پلن.")
 
-# تایید پلن رایگان - بهبود شده با X-UI
+# تایید پلن رایگان - بهبود شده با X-UI سنایی
 async def handle_free_plan_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = update.effective_user.id
     
@@ -785,32 +748,58 @@ async def handle_free_plan_confirm(update: Update, context: ContextTypes.DEFAULT
         # انتخاب اولین سرور فعال
         server = active_servers[0]
         
-        # ایجاد کانفیگ در X-UI
-        user_config, message = await sync_to_async(UserConfigService.create_paid_config)(user, server, plan)
-        
-        if user_config:
-            # ایجاد سفارش رایگان
-            order = await sync_to_async(OrderUserModel.objects.create)(
-                user=user,
-                plans=plan,
-                is_active=True  # پلن رایگان بلافاصله فعال می‌شود
-            )
+        # استفاده از سرویس X-UI برای ایجاد کانفیگ پولی
+        try:
+            from xui_servers.enhanced_api_models import XUIClientManager, XUIInboundManager
             
-            del USER_STATES[telegram_id]
+            # یافتن inbound مناسب
+            inbound_manager = XUIInboundManager(server)
+            inbound = inbound_manager.find_best_inbound("vless")
+            
+            if not inbound:
+                await update.message.reply_text(
+                    "❌ **هیچ inbound مناسبی یافت نشد.**\n\n"
+                    "لطفا با ادمین تماس بگیرید.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # ایجاد کانفیگ پولی با X-UI
+            client_manager = XUIClientManager(server)
+            user_config = await sync_to_async(client_manager.create_user_config)(user, plan, inbound)
+            
+            if user_config:
+                # ایجاد سفارش رایگان
+                order = await sync_to_async(OrderUserModel.objects.create)(
+                    user=user,
+                    plans=plan,
+                    is_active=True  # پلن رایگان بلافاصله فعال می‌شود
+                )
+                
+                del USER_STATES[telegram_id]
+                await update.message.reply_text(
+                    f"🎉 **پلن {plan.name} با موفقیت فعال شد!**\n\n"
+                    f"✅ پلن شما آماده استفاده است.\n"
+                    f"📊 حجم: {plan.in_volume} مگابایت\n"
+                    f"⏰ اعتبار: 30 روز\n"
+                    f"🖥️ سرور: {server.name}\n"
+                    f"🔧 پروتکل: VLESS\n\n"
+                    f"🔧 **کانفیگ شما:**\n"
+                    f"`{user_config.config_data}`",
+                    parse_mode='Markdown',
+                    reply_markup=main_keyboard
+                )
+            else:
+                await update.message.reply_text(
+                    "❌ **خطا در ایجاد کانفیگ در X-UI.**\n\n"
+                    "لطفا با ادمین تماس بگیرید.",
+                    parse_mode='Markdown'
+                )
+        
+        except Exception as e:
+            logger.error(f"خطا در ایجاد کانفیگ پولی: {e}")
             await update.message.reply_text(
-                f"🎉 **پلن {plan.name} با موفقیت فعال شد!**\n\n"
-                f"✅ پلن شما آماده استفاده است.\n"
-                f"📊 حجم: {plan.in_volume} مگابایت\n"
-                f"⏰ اعتبار: 30 روز\n"
-                f"🖥️ سرور: {server.name}\n\n"
-                f"🔧 **کانفیگ شما:**\n"
-                f"`{user_config.config_data}`",
-                parse_mode='Markdown',
-                reply_markup=main_keyboard
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ **خطا در فعال‌سازی پلن:**\n\n{message}",
+                f"❌ **خطا در فعال‌سازی پلن:**\n\n{str(e)}",
                 parse_mode='Markdown'
             )
         
