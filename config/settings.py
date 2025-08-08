@@ -12,6 +12,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from config.env
+load_dotenv('config.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -292,6 +296,20 @@ ERROR_MESSAGE_ENABLED = os.environ.get('ERROR_MESSAGE_ENABLED', 'True').lower() 
 MESSAGE_LANGUAGE = os.environ.get('MESSAGE_LANGUAGE', 'fa')
 MESSAGE_RTL = os.environ.get('MESSAGE_RTL', 'True').lower() == 'true'
 MESSAGE_EMOJI_ENABLED = os.environ.get('MESSAGE_EMOJI_ENABLED', 'True').lower() == 'true'
+
+# تنظیمات ربات‌های تلگرام
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', 'YOUR_ADMIN_BOT_TOKEN')
+USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', 'YOUR_USER_BOT_TOKEN')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
+ADMIN_USER_IDS = [int(uid.strip()) for uid in os.environ.get('ADMIN_USER_IDS', '123456789').split(',')]
+
+# تنظیمات سرور X-UI سنایی
+XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'localhost')
+XUI_DEFAULT_PORT = int(os.environ.get('XUI_DEFAULT_PORT', '54321'))
+XUI_DEFAULT_USERNAME = os.environ.get('XUI_DEFAULT_USERNAME', 'admin')
+XUI_DEFAULT_PASSWORD = os.environ.get('XUI_DEFAULT_PASSWORD', 'admin')
+XUI_WEB_BASE_PATH = os.environ.get('XUI_WEB_BASE_PATH', '/')
+XUI_DEFAULT_INBOUND_ID = int(os.environ.get('XUI_DEFAULT_INBOUND_ID', '1'))
 
 # تنظیمات اضافی ربات‌ها
 BOT_WEBHOOK_URL = os.environ.get('BOT_WEBHOOK_URL', '')

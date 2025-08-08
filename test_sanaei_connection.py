@@ -10,7 +10,7 @@ import django
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv('env_config.env')
+load_dotenv('config.env')
 
 # اضافه کردن مسیر پروژه به sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

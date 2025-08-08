@@ -14,7 +14,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 # Load environment variables
-load_dotenv()
+load_dotenv('config.env')
 
 # اضافه کردن مسیر پروژه به sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
