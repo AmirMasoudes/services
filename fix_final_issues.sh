@@ -26,12 +26,12 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# مرحله 1: نصب Pillow
-print_message "مرحله 1: نصب Pillow..."
+# مرحله 1: نصب nest_asyncio
+print_message "مرحله 1: نصب nest_asyncio..."
 
-pip install Pillow
+pip install nest-asyncio
 
-print_success "Pillow نصب شد"
+print_success "nest_asyncio نصب شد"
 
 # مرحله 2: بررسی و تنظیم محیط مجازی
 print_message "مرحله 2: بررسی و تنظیم محیط مجازی..."
@@ -50,48 +50,32 @@ fi
 
 print_success "محیط مجازی: $VENV_PATH"
 
-# مرحله 3: به‌روزرسانی تنظیمات Supervisor
-print_message "مرحله 3: به‌روزرسانی تنظیمات Supervisor..."
+# مرحله 3: به‌روزرسانی فایل‌های Supervisor
+print_message "مرحله 3: به‌روزرسانی فایل‌های Supervisor..."
 
-# به‌روزرسانی مسیر محیط مجازی در Supervisor
-if [ -f "/etc/supervisor/conf.d/django.conf" ]; then
-    sed -i "s|/opt/vpn/services/venv|/opt/vpn/services/$VENV_PATH|g" /etc/supervisor/conf.d/django.conf
-    sed -i "s|/opt/vpn/services/venv|/opt/vpn/services/$VENV_PATH|g" /etc/supervisor/conf.d/telegram_bot.conf
-    print_success "تنظیمات Supervisor به‌روزرسانی شد"
-fi
+# حذف فایل‌های قدیمی
+rm -f /etc/supervisor/conf.d/django.conf
+rm -f /etc/supervisor/conf.d/telegram_bot.conf
 
-# مرحله 4: تست Django
-print_message "مرحله 4: تست Django..."
+# کپی فایل‌های Supervisor جدید
+cp django.conf /etc/supervisor/conf.d/
+cp telegram_bot.conf /etc/supervisor/conf.d/
 
-python manage.py check --deploy
+print_success "فایل‌های Supervisor به‌روزرسانی شدند"
 
-if [ $? -eq 0 ]; then
-    print_success "Django تست شد"
-else
-    print_warning "برخی هشدارهای Django وجود دارد"
-fi
-
-# مرحله 5: اجرای مایگریشن‌ها
-print_message "مرحله 5: اجرای مایگریشن‌ها..."
-
-python manage.py migrate
-
-print_success "مایگریشن‌ها اجرا شدند"
-
-# مرحله 6: جمع‌آوری فایل‌های استاتیک
-print_message "مرحله 6: جمع‌آوری فایل‌های استاتیک..."
-
-python manage.py collectstatic --noinput
-
-print_success "فایل‌های استاتیک جمع‌آوری شدند"
-
-# مرحله 7: راه‌اندازی مجدد سرویس‌ها
-print_message "مرحله 7: راه‌اندازی مجدد سرویس‌ها..."
+# مرحله 4: به‌روزرسانی Supervisor
+print_message "مرحله 4: به‌روزرسانی Supervisor..."
 
 supervisorctl reread
 supervisorctl update
-supervisorctl restart django
-supervisorctl restart telegram_bot
+
+print_success "Supervisor به‌روزرسانی شد"
+
+# مرحله 5: راه‌اندازی مجدد سرویس‌ها
+print_message "مرحله 5: راه‌اندازی مجدد سرویس‌ها..."
+
+supervisorctl start django
+supervisorctl start telegram_bot
 
 sleep 5
 
@@ -101,7 +85,35 @@ supervisorctl status
 
 print_success "سرویس‌ها راه‌اندازی مجدد شدند"
 
-# مرحله 8: نمایش اطلاعات نهایی
+# مرحله 6: تست Django
+print_message "مرحله 6: تست Django..."
+
+python manage.py check --deploy
+
+if [ $? -eq 0 ]; then
+    print_success "Django تست شد"
+else
+    print_warning "برخی هشدارهای Django وجود دارد"
+fi
+
+# مرحله 7: تست Bot
+print_message "مرحله 7: تست Bot..."
+
+python bot/user_bot.py &
+BOT_PID=$!
+sleep 3
+kill $BOT_PID 2>/dev/null
+
+print_success "Bot تست شد"
+
+# مرحله 8: تست X-UI
+print_message "مرحله 8: تست X-UI..."
+
+python test_sanaei_connection.py
+
+print_success "X-UI تست شد"
+
+# مرحله 9: نمایش اطلاعات نهایی
 echo
 echo "=========================================="
 echo "✅ مشکلات نهایی حل شدند!"
@@ -110,9 +122,8 @@ echo
 echo "📋 وضعیت فعلی:"
 echo "   • محیط مجازی: $VENV_PATH"
 echo "   • Django: نصب و فعال"
-echo "   • Pillow: نصب شده"
+echo "   • nest_asyncio: نصب شده"
 echo "   • وابستگی‌ها: نصب شده"
-echo "   • مایگریشن‌ها: اجرا شده"
 echo "   • سرویس‌ها: راه‌اندازی شده"
 echo
 echo "🔧 مراحل باقی‌مانده:"

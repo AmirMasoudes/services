@@ -1,54 +1,57 @@
 #!/usr/bin/env python3
 """
-اسکریپت تست ساده اتصال به X-UI سنایی
+اسکریپت ساده برای تست اتصال به X-UI
 """
 
 import requests
 import urllib3
-from urllib3.exceptions import InsecureRequestWarning
+from dotenv import load_dotenv
+import os
 
-# غیرفعال کردن هشدارهای SSL
-urllib3.disable_warnings(InsecureRequestWarning)
+# Load environment variables
+load_dotenv('env_config.env')
 
-def test_xui_connection():
+def test_connection():
     """تست اتصال ساده به X-UI"""
     print("🔍 تست اتصال ساده به X-UI...")
     
-    # تنظیمات سرور
-    host = "156.244.31.37"
-    port = 50987
-    username = "bUZC0Iovb9"
-    password = "4jb7doDQZg"
-    web_base_path = "/YvIhWQ3Pt6cHGXegE4/"
+    # دریافت تنظیمات
+    host = os.getenv('XUI_DEFAULT_HOST')
+    port = int(os.getenv('XUI_DEFAULT_PORT', 54321))
+    username = os.getenv('XUI_DEFAULT_USERNAME')
+    password = os.getenv('XUI_DEFAULT_PASSWORD')
+    web_base_path = os.getenv('XUI_WEB_BASE_PATH', '/')
+    use_ssl = os.getenv('XUI_USE_SSL', 'False').lower() == 'true'
     
-    # تست 1: HTTP
-    print("\n📡 تست HTTP...")
+    print(f"📋 تنظیمات سرور:")
+    print(f"   • آدرس: {host}")
+    print(f"   • پورت: {port}")
+    print(f"   • نام کاربری: {username}")
+    print(f"   • مسیر وب: {web_base_path}")
+    print(f"   • استفاده از SSL: {use_ssl}")
+    
+    # تست HTTP
+    print("\n🔧 تست HTTP...")
     try:
-        url = f"http://{host}:{port}{web_base_path}login"
-        print(f"آدرس: {url}")
+        protocol = "https" if use_ssl else "http"
+        url = f"{protocol}://{host}:{port}{web_base_path}"
+        print(f"URL: {url}")
         
         response = requests.get(url, timeout=10, verify=False)
-        print(f"کد وضعیت: {response.status_code}")
-        print(f"محتوای پاسخ: {response.text[:200]}")
+        print(f"✅ HTTP موفق - کد: {response.status_code}")
+        print(f"محتوای پاسخ: {response.text[:200]}...")
         
+    except requests.exceptions.SSLError as e:
+        print(f"❌ خطای SSL: {e}")
+    except requests.exceptions.ConnectionError as e:
+        print(f"❌ خطای اتصال: {e}")
+    except requests.exceptions.Timeout as e:
+        print(f"❌ خطای تایم‌اوت: {e}")
     except Exception as e:
-        print(f"❌ خطا در HTTP: {e}")
+        print(f"❌ خطای نامشخص: {e}")
     
-    # تست 2: HTTPS
-    print("\n📡 تست HTTPS...")
-    try:
-        url = f"https://{host}:{port}{web_base_path}login"
-        print(f"آدرس: {url}")
-        
-        response = requests.get(url, timeout=10, verify=False)
-        print(f"کد وضعیت: {response.status_code}")
-        print(f"محتوای پاسخ: {response.text[:200]}")
-        
-    except Exception as e:
-        print(f"❌ خطا در HTTPS: {e}")
-    
-    # تست 3: اتصال مستقیم
-    print("\n📡 تست اتصال مستقیم...")
+    # تست پورت
+    print("\n🔧 تست پورت...")
     try:
         import socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,43 +60,21 @@ def test_xui_connection():
         sock.close()
         
         if result == 0:
-            print("✅ پورت باز است")
+            print(f"✅ پورت {port} باز است")
         else:
-            print("❌ پورت بسته است")
+            print(f"❌ پورت {port} بسته است")
             
     except Exception as e:
-        print(f"❌ خطا در اتصال مستقیم: {e}")
-
-def test_curl_equivalent():
-    """تست مشابه curl"""
-    print("\n🔧 تست مشابه curl...")
+        print(f"❌ خطا در تست پورت: {e}")
     
-    import subprocess
-    
-    # تست HTTP
+    # تست DNS
+    print("\n🔧 تست DNS...")
     try:
-        cmd = f"curl -k -v http://156.244.31.37:50987/YvIhWQ3Pt6cHGXegE4/login"
-        print(f"دستور: {cmd}")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-        print(f"کد خروجی: {result.returncode}")
-        print(f"خروجی: {result.stdout[:200]}")
-        print(f"خطا: {result.stderr[:200]}")
+        import socket
+        ip = socket.gethostbyname(host)
+        print(f"✅ DNS موفق - IP: {ip}")
     except Exception as e:
-        print(f"❌ خطا در curl HTTP: {e}")
-    
-    # تست HTTPS
-    try:
-        cmd = f"curl -k -v https://156.244.31.37:50987/YvIhWQ3Pt6cHGXegE4/login"
-        print(f"دستور: {cmd}")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-        print(f"کد خروجی: {result.returncode}")
-        print(f"خروجی: {result.stdout[:200]}")
-        print(f"خطا: {result.stderr[:200]}")
-    except Exception as e:
-        print(f"❌ خطا در curl HTTPS: {e}")
+        print(f"❌ خطای DNS: {e}")
 
 if __name__ == "__main__":
-    print("🚀 شروع تست اتصال ساده...")
-    test_xui_connection()
-    test_curl_equivalent()
-    print("\n✅ تست اتصال ساده تمام شد")
+    test_connection()
