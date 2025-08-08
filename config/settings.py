@@ -160,19 +160,19 @@ REST_FRAMEWORK = {
 }
 
 # تنظیمات ربات ادمین
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz')
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '8450508816:AAFE6XAj8QvA9iIP12whrKxYRtgsoHFCiFU')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ADMIN_USER_IDS = [int(x.strip()) for x in os.environ.get('ADMIN_USER_IDS', '123456789').split(',')]
 
 # تنظیمات ربات کاربران
-USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', 'your_user_bot_token_here')
+USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', '8202994859:AAGg68pT5HGR1W9D4pxqnAGeKoZKrD9Dnzs')
 
 # تنظیمات سرور X-UI
-XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'your_xui_server_host')
-XUI_DEFAULT_PORT = int(os.environ.get('XUI_DEFAULT_PORT', '54321'))
-XUI_DEFAULT_USERNAME = os.environ.get('XUI_DEFAULT_USERNAME', 'admin')
-XUI_DEFAULT_PASSWORD = os.environ.get('XUI_DEFAULT_PASSWORD', 'your_xui_password')
-XUI_WEB_BASE_PATH = os.environ.get('XUI_WEB_BASE_PATH', '/')
+XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'time.amirprogrammer.ir')
+XUI_DEFAULT_PORT = int(os.environ.get('XUI_DEFAULT_PORT', '50987'))
+XUI_DEFAULT_USERNAME = os.environ.get('XUI_DEFAULT_USERNAME', 'bUZC0Iovb9')
+XUI_DEFAULT_PASSWORD = os.environ.get('XUI_DEFAULT_PASSWORD', '4jb7doDQZg')
+XUI_WEB_BASE_PATH = os.environ.get('XUI_WEB_BASE_PATH', '/YvIhWQ3Pt6cHGXegE4/')
 
 # تنظیمات ایمیل
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
@@ -181,34 +181,18 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'your_email@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'your_email_password')
 
-# تنظیمات فایل‌های استاتیک و مدیا
-STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, 'staticfiles'))
-MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))
-
-# تنظیمات لاگینگ
-LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
-LOG_FILE = os.environ.get('LOG_FILE', 'logs/django.log')
-
 # تنظیمات پروتکل‌های VPN
 DEFAULT_PROTOCOL = os.environ.get('DEFAULT_PROTOCOL', 'vless')
-DEFAULT_PORTS_VMESS = int(os.environ.get('DEFAULT_PORTS_VMESS', '443'))
-DEFAULT_PORTS_VLESS = int(os.environ.get('DEFAULT_PORTS_VLESS', '443'))
-DEFAULT_PORTS_TROJAN = int(os.environ.get('DEFAULT_PORTS_TROJAN', '443'))
 MIN_PORT = int(os.environ.get('MIN_PORT', '10000'))
 MAX_PORT = int(os.environ.get('MAX_PORT', '65000'))
 
 # تنظیمات زمان انقضا
 TRIAL_HOURS = int(os.environ.get('TRIAL_HOURS', '24'))
 PAID_DAYS = int(os.environ.get('PAID_DAYS', '30'))
-EXTEND_HOURS = int(os.environ.get('EXTEND_HOURS', '24'))
-GRACE_PERIOD_HOURS = int(os.environ.get('GRACE_PERIOD_HOURS', '2'))
 
 # تنظیمات امنیت
-ENABLE_SNIFFING = os.environ.get('ENABLE_SNIFFING', 'True').lower() == 'true'
-SNIFFING_PROTOCOLS = os.environ.get('SNIFFING_PROTOCOLS', 'http,tls,quic').split(',')
 TLS_ENABLED = os.environ.get('TLS_ENABLED', 'True').lower() == 'true'
 REALITY_ENABLED = os.environ.get('REALITY_ENABLED', 'True').lower() == 'true'
-ENABLE_UDP = os.environ.get('ENABLE_UDP', 'True').lower() == 'true'
 
 # تنظیمات نام‌گذاری
 TRIAL_INBOUND_PREFIX = os.environ.get('TRIAL_INBOUND_PREFIX', 'TrialBot')
@@ -218,192 +202,37 @@ USER_INBOUND_PREFIX = os.environ.get('USER_INBOUND_PREFIX', 'UserBot')
 # تنظیمات اتصال
 CONNECTION_TIMEOUT = int(os.environ.get('CONNECTION_TIMEOUT', '15'))
 RETRY_ATTEMPTS = int(os.environ.get('RETRY_ATTEMPTS', '5'))
-RETRY_DELAY = int(os.environ.get('RETRY_DELAY', '2'))
 
 # تنظیمات پیشرفته
 LIMIT_IP_PER_USER = int(os.environ.get('LIMIT_IP_PER_USER', '3'))
 MB_TO_GB_CONVERSION = int(os.environ.get('MB_TO_GB_CONVERSION', '1024'))
-ENABLE_LOGGING = os.environ.get('ENABLE_LOGGING', 'True').lower() == 'true'
-MAX_LOG_SIZE = os.environ.get('MAX_LOG_SIZE', '10MB')
-LOG_BACKUP_COUNT = int(os.environ.get('LOG_BACKUP_COUNT', '5'))
 
-# تنظیمات عملکرد
-CACHE_TIMEOUT = int(os.environ.get('CACHE_TIMEOUT', '300'))
-SESSION_TIMEOUT = int(os.environ.get('SESSION_TIMEOUT', '3600'))
-API_RATE_LIMIT = int(os.environ.get('API_RATE_LIMIT', '100'))
-API_RATE_LIMIT_PERIOD = int(os.environ.get('API_RATE_LIMIT_PERIOD', '60'))
-
-# تنظیمات پاکسازی خودکار
-AUTO_CLEANUP_ENABLED = os.environ.get('AUTO_CLEANUP_ENABLED', 'True').lower() == 'true'
-AUTO_CLEANUP_INTERVAL = int(os.environ.get('AUTO_CLEANUP_INTERVAL', '86400'))
-CLEANUP_LOG_RETENTION_DAYS = int(os.environ.get('CLEANUP_LOG_RETENTION_DAYS', '30'))
-CLEANUP_TEMP_FILES = os.environ.get('CLEANUP_TEMP_FILES', 'True').lower() == 'true'
-
-# تنظیمات مانیتورینگ
-MONITORING_ENABLED = os.environ.get('MONITORING_ENABLED', 'True').lower() == 'true'
-MONITORING_INTERVAL = int(os.environ.get('MONITORING_INTERVAL', '300'))
-ALERT_EMAIL_ENABLED = os.environ.get('ALERT_EMAIL_ENABLED', 'False').lower() == 'true'
-ALERT_EMAIL_RECIPIENTS = os.environ.get('ALERT_EMAIL_RECIPIENTS', '').split(',')
-
-# تنظیمات پشتیبان‌گیری
-BACKUP_ENABLED = os.environ.get('BACKUP_ENABLED', 'True').lower() == 'true'
-BACKUP_INTERVAL = int(os.environ.get('BACKUP_INTERVAL', '86400'))
-BACKUP_RETENTION_DAYS = int(os.environ.get('BACKUP_RETENTION_DAYS', '7'))
-BACKUP_PATH = os.environ.get('BACKUP_PATH', 'backups/')
-
-# تنظیمات امنیتی پیشرفته
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost,https://localhost,http://127.0.0.1,https://127.0.0.1').split(',')
-SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
-SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() == 'true'
-SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() == 'true'
-SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True').lower() == 'true'
-SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True').lower() == 'true'
-SECURE_FRAME_DENY = os.environ.get('SECURE_FRAME_DENY', 'True').lower() == 'true'
-
-# تنظیمات پلن‌ها و پرداخت
+# تنظیمات پلن‌ها
 DEFAULT_TRIAL_PLAN_NAME = os.environ.get('DEFAULT_TRIAL_PLAN_NAME', 'پلن تستی')
 DEFAULT_TRIAL_PLAN_DURATION = int(os.environ.get('DEFAULT_TRIAL_PLAN_DURATION', '24'))
 DEFAULT_TRIAL_PLAN_TRAFFIC = int(os.environ.get('DEFAULT_TRIAL_PLAN_TRAFFIC', '0'))
 DEFAULT_TRIAL_PLAN_PRICE = int(os.environ.get('DEFAULT_TRIAL_PLAN_PRICE', '0'))
 
-PAID_PLANS_ENABLED = os.environ.get('PAID_PLANS_ENABLED', 'True').lower() == 'true'
-PAID_PLANS_DISCOUNT_PERCENT = int(os.environ.get('PAID_PLANS_DISCOUNT_PERCENT', '0'))
-PAID_PLANS_REFERRAL_BONUS = int(os.environ.get('PAID_PLANS_REFERRAL_BONUS', '0'))
-
-# تنظیمات پرداخت
-PAYMENT_GATEWAY = os.environ.get('PAYMENT_GATEWAY', '')
-PAYMENT_MERCHANT_ID = os.environ.get('PAYMENT_MERCHANT_ID', '')
-PAYMENT_CALLBACK_URL = os.environ.get('PAYMENT_CALLBACK_URL', '')
-PAYMENT_SUCCESS_URL = os.environ.get('PAYMENT_SUCCESS_URL', '')
-PAYMENT_FAILURE_URL = os.environ.get('PAYMENT_FAILURE_URL', '')
-
 # تنظیمات ارز
 CURRENCY = os.environ.get('CURRENCY', 'IRR')
 CURRENCY_SYMBOL = os.environ.get('CURRENCY_SYMBOL', 'تومان')
-EXCHANGE_RATE = float(os.environ.get('EXCHANGE_RATE', '1'))
 
-# تنظیمات اعلان‌ها و پیام‌ها
+# تنظیمات اعلان‌ها
 TELEGRAM_NOTIFICATIONS_ENABLED = os.environ.get('TELEGRAM_NOTIFICATIONS_ENABLED', 'True').lower() == 'true'
-TELEGRAM_ADMIN_NOTIFICATIONS = os.environ.get('TELEGRAM_ADMIN_NOTIFICATIONS', 'True').lower() == 'true'
-TELEGRAM_USER_NOTIFICATIONS = os.environ.get('TELEGRAM_USER_NOTIFICATIONS', 'True').lower() == 'true'
-
 SYSTEM_MESSAGES_ENABLED = os.environ.get('SYSTEM_MESSAGES_ENABLED', 'True').lower() == 'true'
-WELCOME_MESSAGE_ENABLED = os.environ.get('WELCOME_MESSAGE_ENABLED', 'True').lower() == 'true'
-HELP_MESSAGE_ENABLED = os.environ.get('HELP_MESSAGE_ENABLED', 'True').lower() == 'true'
-ERROR_MESSAGE_ENABLED = os.environ.get('ERROR_MESSAGE_ENABLED', 'True').lower() == 'true'
 
+# تنظیمات پیام‌ها
 MESSAGE_LANGUAGE = os.environ.get('MESSAGE_LANGUAGE', 'fa')
 MESSAGE_RTL = os.environ.get('MESSAGE_RTL', 'True').lower() == 'true'
-MESSAGE_EMOJI_ENABLED = os.environ.get('MESSAGE_EMOJI_ENABLED', 'True').lower() == 'true'
-
-# تنظیمات ربات‌های تلگرام
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', 'YOUR_ADMIN_BOT_TOKEN')
-USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', 'YOUR_USER_BOT_TOKEN')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
-ADMIN_USER_IDS = [int(uid.strip()) for uid in os.environ.get('ADMIN_USER_IDS', '123456789').split(',')]
-
-# تنظیمات سرور X-UI سنایی
-XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'localhost')
-XUI_DEFAULT_PORT = int(os.environ.get('XUI_DEFAULT_PORT', '54321'))
-XUI_DEFAULT_USERNAME = os.environ.get('XUI_DEFAULT_USERNAME', 'admin')
-XUI_DEFAULT_PASSWORD = os.environ.get('XUI_DEFAULT_PASSWORD', 'admin')
-XUI_WEB_BASE_PATH = os.environ.get('XUI_WEB_BASE_PATH', '/')
-XUI_DEFAULT_INBOUND_ID = int(os.environ.get('XUI_DEFAULT_INBOUND_ID', '1'))
-
-# تنظیمات اضافی ربات‌ها
-BOT_WEBHOOK_URL = os.environ.get('BOT_WEBHOOK_URL', '')
-BOT_WEBHOOK_PATH = os.environ.get('BOT_WEBHOOK_PATH', '/webhook/')
-BOT_WEBHOOK_SECRET = os.environ.get('BOT_WEBHOOK_SECRET', 'your_webhook_secret_here')
-
-WELCOME_MESSAGE = os.environ.get('WELCOME_MESSAGE', 'سلام! به ربات VPN خوش آمدید 🚀')
-HELP_MESSAGE = os.environ.get('HELP_MESSAGE', 'برای دریافت راهنما از دکمه‌های زیر استفاده کنید 📚')
-ERROR_MESSAGE = os.environ.get('ERROR_MESSAGE', 'متأسفانه خطایی رخ داد. لطفاً دوباره تلاش کنید ❌')
-
-# تنظیمات اضافی X-UI
-XUI_USE_SSL = os.environ.get('XUI_USE_SSL', 'False').lower() == 'true'
-XUI_VERIFY_SSL = os.environ.get('XUI_VERIFY_SSL', 'False').lower() == 'true'
-XUI_TIMEOUT = int(os.environ.get('XUI_TIMEOUT', '30'))
-XUI_API_VERSION = os.environ.get('XUI_API_VERSION', 'v1')
-XUI_DEFAULT_PORT_RANGE_START = int(os.environ.get('XUI_DEFAULT_PORT_RANGE_START', '10000'))
-XUI_DEFAULT_PORT_RANGE_END = int(os.environ.get('XUI_DEFAULT_PORT_RANGE_END', '65000'))
-
-# تنظیمات پروتکل‌های مختلف
-PROTOCOL_SETTINGS_VMESS = os.environ.get('PROTOCOL_SETTINGS_VMESS', '{"network":"ws","security":"none"}')
-PROTOCOL_SETTINGS_VLESS = os.environ.get('PROTOCOL_SETTINGS_VLESS', '{"network":"tcp","security":"reality"}')
-PROTOCOL_SETTINGS_TROJAN = os.environ.get('PROTOCOL_SETTINGS_TROJAN', '{"network":"tcp","security":"tls"}')
 
 # تنظیمات Reality
 REALITY_DEST = os.environ.get('REALITY_DEST', 'www.aparat.com:443')
 REALITY_SERVER_NAMES = os.environ.get('REALITY_SERVER_NAMES', 'www.aparat.com')
 REALITY_PRIVATE_KEY = os.environ.get('REALITY_PRIVATE_KEY', 'YFgo8YQUJmqhu2yXL8rd8D9gDgJ1H1XgfbYqMB6LmoM')
-REALITY_SHORT_IDS = os.environ.get('REALITY_SHORT_IDS', '')
 
 # تنظیمات WebSocket
 WS_PATH = os.environ.get('WS_PATH', '/')
 WS_HOST = os.environ.get('WS_HOST', '')
 
-# تنظیمات اضافی زمان
-AUTO_DELETE_EXPIRED_CONFIGS = os.environ.get('AUTO_DELETE_EXPIRED_CONFIGS', 'True').lower() == 'true'
-AUTO_DELETE_CHECK_INTERVAL = int(os.environ.get('AUTO_DELETE_CHECK_INTERVAL', '3600'))
-EXPIRY_WARNING_HOURS = int(os.environ.get('EXPIRY_WARNING_HOURS', '6'))
-EXPIRY_WARNING_MESSAGE = os.environ.get('EXPIRY_WARNING_MESSAGE', 'کانفیگ شما تا {hours} ساعت دیگر منقضی می‌شود ⏰')
-
-# تنظیمات امنیتی اضافی
-ENABLE_PROXY_PROTOCOL = os.environ.get('ENABLE_PROXY_PROTOCOL', 'False').lower() == 'true'
-ENABLE_FALLBACK = os.environ.get('ENABLE_FALLBACK', 'True').lower() == 'true'
-ENABLE_MUX = os.environ.get('ENABLE_MUX', 'False').lower() == 'true'
-ENABLE_UTLS = os.environ.get('ENABLE_UTLS', 'False').lower() == 'true'
-
-FIREWALL_ENABLED = os.environ.get('FIREWALL_ENABLED', 'False').lower() == 'true'
-FIREWALL_RULES = os.environ.get('FIREWALL_RULES', '')
-
-# تنظیمات نام‌گذاری اضافی
-INBOUND_SEPARATOR = os.environ.get('INBOUND_SEPARATOR', '-')
-USER_SEPARATOR = os.environ.get('USER_SEPARATOR', '_')
-CONFIG_SEPARATOR = os.environ.get('CONFIG_SEPARATOR', '|')
-
-TRIAL_CONFIG_PATTERN = os.environ.get('TRIAL_CONFIG_PATTERN', '{prefix}{separator}{user_id}{separator}{protocol}')
-PAID_CONFIG_PATTERN = os.environ.get('PAID_CONFIG_PATTERN', '{prefix}{separator}{user_id}{separator}{plan_id}{separator}{protocol}')
-USER_CONFIG_PATTERN = os.environ.get('USER_CONFIG_PATTERN', '{prefix}{separator}{user_id}{separator}{protocol}')
-
-# تنظیمات اتصال اضافی
-CONNECTION_POOL_SIZE = int(os.environ.get('CONNECTION_POOL_SIZE', '10'))
-CONNECTION_KEEP_ALIVE = os.environ.get('CONNECTION_KEEP_ALIVE', 'True').lower() == 'true'
-CONNECTION_MAX_RETRIES = int(os.environ.get('CONNECTION_MAX_RETRIES', '3'))
-CONNECTION_BACKOFF_FACTOR = int(os.environ.get('CONNECTION_BACKOFF_FACTOR', '2'))
-
-# تنظیمات لاگینگ اضافی
-LOG_FORMAT = os.environ.get('LOG_FORMAT', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-LOG_DATE_FORMAT = os.environ.get('LOG_DATE_FORMAT', '%Y-%m-%d %H:%M:%S')
-LOG_MAX_SIZE = int(os.environ.get('LOG_MAX_SIZE', '10485760'))
-
-BOT_LOG_FILE = os.environ.get('BOT_LOG_FILE', 'logs/bot.log')
-XUI_LOG_FILE = os.environ.get('XUI_LOG_FILE', 'logs/xui.log')
-ERROR_LOG_FILE = os.environ.get('ERROR_LOG_FILE', 'logs/error.log')
-
-# تنظیمات فایل‌های اضافی
-FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', '2621440'))
-DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('DATA_UPLOAD_MAX_MEMORY_SIZE', '2621440'))
-DATA_UPLOAD_MAX_NUMBER_FIELDS = int(os.environ.get('DATA_UPLOAD_MAX_NUMBER_FIELDS', '1000'))
-
-# تنظیمات ایمیل اضافی
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
-EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '30'))
-EMAIL_SSL_KEYFILE = os.environ.get('EMAIL_SSL_KEYFILE', '')
-EMAIL_SSL_CERTFILE = os.environ.get('EMAIL_SSL_CERTFILE', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'your_email@gmail.com')
-
-# تنظیمات پایگاه داده اضافی
-DATABASE_ENGINE = os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3')
-DATABASE_NAME = os.environ.get('DATABASE_NAME', 'db.sqlite3')
-DATABASE_USER = os.environ.get('DATABASE_USER', '')
-DATABASE_PASSWORD = os.environ.get('DATABASE_PASSWORD', '')
-DATABASE_HOST = os.environ.get('DATABASE_HOST', '')
-DATABASE_PORT = os.environ.get('DATABASE_PORT', '')
-
-# تنظیمات زبان و منطقه زمانی
-LANGUAGE_CODE = os.environ.get('LANGUAGE_CODE', 'fa-ir')
-TIME_ZONE = os.environ.get('TIME_ZONE', 'Asia/Tehran')
-USE_I18N = os.environ.get('USE_I18N', 'True').lower() == 'true'
-USE_TZ = os.environ.get('USE_TZ', 'True').lower() == 'true'
+# تنظیمات امنیتی
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://time.amirprogrammer.ir,https://time.amirprogrammer.ir,http://156.244.31.37,https://156.244.31.37').split(',')
