@@ -35,12 +35,14 @@ def test_sanaei_connection():
     username = os.getenv('XUI_DEFAULT_USERNAME')
     password = os.getenv('XUI_DEFAULT_PASSWORD')
     web_base_path = os.getenv('XUI_WEB_BASE_PATH', '/MsxZ4xuIy5xLfQtsSC/')
+    use_ssl = os.getenv('XUI_USE_SSL', 'True').lower() == 'true'
     
     print(f"📋 تنظیمات سرور:")
     print(f"   • آدرس: {host}")
     print(f"   • پورت: {port}")
     print(f"   • نام کاربری: {username}")
     print(f"   • مسیر وب: {web_base_path}")
+    print(f"   • استفاده از SSL: {use_ssl}")
     
     if not all([host, username, password]):
         print("❌ تنظیمات ناقص است. لطفا فایل env_config.env را بررسی کنید.")
@@ -49,7 +51,7 @@ def test_sanaei_connection():
     try:
         # تست با API مستقیم
         print("\n🔧 تست با API مستقیم...")
-        api = SanaeiXUIAPI(host, port, username, password, web_base_path)
+        api = SanaeiXUIAPI(host, port, username, password, web_base_path, use_ssl)
         
         # تست لاگین
         if api.login():

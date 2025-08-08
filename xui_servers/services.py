@@ -18,8 +18,11 @@ class XUIService:
     
     def __init__(self, server: XUIServer):
         self.server = server
-        # به‌روزرسانی base_url برای پشتیبانی از web base path
-        base_url = f"http://{server.host}:{server.port}"
+        # به‌روزرسانی base_url برای پشتیبانی از HTTPS و web base path
+        from django.conf import settings
+        use_ssl = getattr(settings, 'XUI_USE_SSL', True)
+        protocol = "https" if use_ssl else "http"
+        base_url = f"{protocol}://{server.host}:{server.port}"
         if hasattr(server, 'web_base_path') and server.web_base_path:
             base_url += server.web_base_path
         self.base_url = base_url.rstrip('/')
@@ -29,6 +32,10 @@ class XUIService:
             'Content-Type': 'application/json',
             'User-Agent': 'Django-XUI-Bot/3.0'
         })
+        
+        # تنظیم SSL verification
+        verify_ssl = getattr(settings, 'XUI_VERIFY_SSL', False)
+        self.session.verify = verify_ssl
         self._token = None
         
         # استفاده از سرویس‌های پیشرفته

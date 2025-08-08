@@ -174,6 +174,11 @@ XUI_DEFAULT_USERNAME = os.environ.get('XUI_DEFAULT_USERNAME', 'bUZC0Iovb9')
 XUI_DEFAULT_PASSWORD = os.environ.get('XUI_DEFAULT_PASSWORD', '4jb7doDQZg')
 XUI_WEB_BASE_PATH = os.environ.get('XUI_WEB_BASE_PATH', '/YvIhWQ3Pt6cHGXegE4/')
 
+# تنظیمات HTTPS برای X-UI
+XUI_USE_SSL = os.environ.get('XUI_USE_SSL', 'True').lower() == 'true'
+XUI_VERIFY_SSL = os.environ.get('XUI_VERIFY_SSL', 'False').lower() == 'true'
+XUI_TIMEOUT = int(os.environ.get('XUI_TIMEOUT', '30'))
+
 # تنظیمات ایمیل
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))

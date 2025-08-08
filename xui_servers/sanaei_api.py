@@ -16,15 +16,17 @@ from typing import Optional, Dict, List, Any
 class SanaeiXUIAPI:
     """کلاس اصلی برای اتصال به X-UI سنایی"""
     
-    def __init__(self, host: str, port: int, username: str, password: str, web_base_path: str = "/MsxZ4xuIy5xLfQtsSC/"):
+    def __init__(self, host: str, port: int, username: str, password: str, web_base_path: str = "/MsxZ4xuIy5xLfQtsSC/", use_ssl: bool = True):
         self.host = host
         self.port = port
         self.username = username
         self.password = password
         self.web_base_path = web_base_path.rstrip('/')
+        self.use_ssl = use_ssl
         
-        # ساخت URL پایه
-        self.base_url = f"http://{host}:{port}{web_base_path}"
+        # ساخت URL پایه با پشتیبانی از HTTPS
+        protocol = "https" if use_ssl else "http"
+        self.base_url = f"{protocol}://{host}:{port}{web_base_path}"
         
         # تنظیم session
         self.session = requests.Session()
@@ -32,6 +34,9 @@ class SanaeiXUIAPI:
             'Content-Type': 'application/json',
             'User-Agent': 'Django-XUI-Bot/3.0'
         })
+        
+        # تنظیم SSL verification
+        self.session.verify = False  # برای X-UI معمولاً self-signed certificate دارد
         
         self._token = None
         self._logged_in = False
