@@ -511,17 +511,23 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = await sync_to_async(UsersModel.objects.get)(telegram_id=telegram_id)
         
-        # محاسبه آمار کاربر
-        total_orders = await sync_to_async(OrderUserModel.objects.filter)(user=user)
-        active_orders = await sync_to_async(total_orders.filter)(is_active=True)
+        # محاسبه آمار کاربر به صورت صحیح async
+        total_orders_count = await sync_to_async(OrderUserModel.objects.filter(user=user).count)()
+        active_orders_count = await sync_to_async(OrderUserModel.objects.filter(user=user, is_active=True).count)()
         
         # بررسی کانفیگ تستی
-        trial_config = await sync_to_async(lambda: getattr(user, 'trial_config', None))()
-        trial_status = "✅ فعال" if trial_config and not trial_config.is_expired() else "❌ غیرفعال"
+        try:
+            trial_config = await sync_to_async(lambda: hasattr(user, 'trial_config') and user.trial_config)()
+            trial_status = "✅ فعال" if trial_config and not await sync_to_async(trial_config.is_expired)() else "❌ غیرفعال"
+        except:
+            trial_status = "❌ غیرفعال"
         
         # بررسی کانفیگ‌های X-UI
-        xui_configs = await sync_to_async(list)(UserConfig.objects.filter(user=user, is_active=True))
-        active_xui_configs = [c for c in xui_configs if not c.is_expired()]
+        xui_configs_count = await sync_to_async(UserConfig.objects.filter(user=user, is_active=True).count)()
+        
+        # بررسی پلن تستی استفاده شده
+        trial_used = await sync_to_async(lambda: user.has_used_trial)()
+        trial_text = "استفاده شده" if trial_used else "هنوز استفاده نشده"
         
         profile_text = (
             f"👤 **پروفایل شما**\n\n"
@@ -529,10 +535,10 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 **نام:** {user.full_name}\n"
             f"📱 **نام کاربری:** @{user.username or 'تعریف نشده'}\n"
             f"📅 **تاریخ عضویت:** {user.created_at.strftime('%Y/%m/%d')}\n"
-            f"📦 **کل سفارشات:** {await sync_to_async(total_orders.count)()}\n"
-            f"✅ **سفارشات فعال:** {await sync_to_async(active_orders.count)()}\n"
-            f"🎁 **پلن تستی:** {trial_status}\n"
-            f"🔧 **کانفیگ‌های فعال:** {len(active_xui_configs)}\n\n"
+            f"📦 **کل سفارشات:** {total_orders_count}\n"
+            f"✅ **سفارشات فعال:** {active_orders_count}\n"
+            f"🎁 **پلن تستی:** {trial_text}\n"
+            f"🔧 **کانفیگ‌های فعال:** {xui_configs_count}\n\n"
             f"💡 برای خرید پلن جدید، گزینه 🛒 خرید پلن را انتخاب کنید."
         )
         
@@ -552,7 +558,8 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = await sync_to_async(UsersModel.objects.get)(telegram_id=telegram_id)
         
-        if not user.can_get_trial():
+        can_get_trial = await sync_to_async(user.can_get_trial)()
+        if not can_get_trial:
             await update.message.reply_text(
                 "❌ **شما قبلاً از پلن تستی استفاده کرده‌اید.**\n\n"
                 "💡 برای استفاده از سرویس، لطفا یکی از پلن‌های پولی را انتخاب کنید.",
@@ -579,7 +586,7 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # یافتن inbound مناسب
             inbound_manager = XUIInboundManager(server)
-            inbound = inbound_manager.find_best_inbound("vless")
+            inbound = await sync_to_async(inbound_manager.find_best_inbound)("vless")
             
             if not inbound:
                 await update.message.reply_text(
@@ -591,11 +598,11 @@ async def trial_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # ایجاد کانفیگ تستی با X-UI
             client_manager = XUIClientManager(server)
-            user_config = await sync_to_async(client_manager.create_trial_config)(user, inbound)
+            user_config = await client_manager.create_trial_config_async(user, inbound)
             
             if user_config:
                 # علامت‌گذاری استفاده از پلن تستی
-                await sync_to_async(user.mark_trial_used)()
+                await user.mark_trial_used_async()
                 
                 await update.message.reply_text(
                     f"🎉 **پلن تستی شما فعال شد!**\n\n"
@@ -754,7 +761,7 @@ async def handle_free_plan_confirm(update: Update, context: ContextTypes.DEFAULT
             
             # یافتن inbound مناسب
             inbound_manager = XUIInboundManager(server)
-            inbound = inbound_manager.find_best_inbound("vless")
+            inbound = await sync_to_async(inbound_manager.find_best_inbound)("vless")
             
             if not inbound:
                 await update.message.reply_text(
@@ -766,7 +773,7 @@ async def handle_free_plan_confirm(update: Update, context: ContextTypes.DEFAULT
             
             # ایجاد کانفیگ پولی با X-UI
             client_manager = XUIClientManager(server)
-            user_config = await sync_to_async(client_manager.create_user_config)(user, plan, inbound)
+            user_config = await client_manager.create_user_config_async(user, plan, inbound)
             
             if user_config:
                 # ایجاد سفارش رایگان
@@ -892,29 +899,30 @@ async def my_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = update.effective_user.id
     try:
         user = await sync_to_async(UsersModel.objects.get)(telegram_id=telegram_id)
-        orders = await sync_to_async(list)(OrderUserModel.objects.filter(user=user).order_by('-created_at'))
         
         response = "📦 **پلن‌های شما:**\n\n"
         
         # بررسی کانفیگ تستی
-        trial_config = await sync_to_async(lambda: getattr(user, 'trial_config', None))()
-        if trial_config and not trial_config.is_expired():
-            remaining_time = trial_config.get_remaining_time()
-            hours = int(remaining_time.total_seconds() // 3600)
-            minutes = int((remaining_time.total_seconds() % 3600) // 60)
-            
-            response += (
-                f"🎁 **پلن تستی**\n"
-                f"📊 حجم: نامحدود\n"
-                f"⏰ اعتبار: {hours} ساعت و {minutes} دقیقه باقی\n"
-                f"🔧 کانفیگ: `{trial_config.config}`\n\n"
-            )
+        try:
+            trial_config = await sync_to_async(lambda: hasattr(user, 'trial_config') and user.trial_config)()
+            if trial_config and not await sync_to_async(trial_config.is_expired)():
+                remaining_time = await sync_to_async(trial_config.get_remaining_time)()
+                hours = int(remaining_time.total_seconds() // 3600)
+                minutes = int((remaining_time.total_seconds() % 3600) // 60)
+                
+                response += (
+                    f"🎁 **پلن تستی**\n"
+                    f"📊 حجم: 1GB\n"
+                    f"⏰ اعتبار: {hours} ساعت و {minutes} دقیقه باقی\n\n"
+                )
+        except:
+            pass
         
         # بررسی کانفیگ‌های X-UI
         xui_configs = await sync_to_async(list)(UserConfig.objects.filter(user=user, is_active=True))
         for config in xui_configs:
-            if not config.is_expired():
-                remaining_time = config.get_remaining_time()
+            if not await sync_to_async(config.is_expired)():
+                remaining_time = await sync_to_async(config.get_remaining_time)()
                 if remaining_time:
                     hours = int(remaining_time.total_seconds() // 3600)
                     minutes = int((remaining_time.total_seconds() % 3600) // 60)
@@ -925,10 +933,11 @@ async def my_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response += (
                     f"🔧 **{config.config_name}**\n"
                     f"🖥️ سرور: {config.server.name}\n"
-                    f"⏰ اعتبار: {time_text}\n"
-                    f"🔧 کانفیگ: `{config.config_data}`\n\n"
+                    f"⏰ اعتبار: {time_text}\n\n"
                 )
         
+        # بررسی سفارشات پولی
+        orders = await sync_to_async(list)(OrderUserModel.objects.filter(user=user).order_by('-created_at'))
         if orders:
             for order in orders:
                 status = "✅ فعال" if order.is_active else "⏳ در انتظار تایید"
@@ -936,12 +945,12 @@ async def my_plans(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 response += (
                     f"{status_emoji} **{order.plans.name}**\n"
-                f"💰 قیمت: {order.plans.price:,} تومان\n"
-                f"📊 حجم: {order.plans.in_volume} مگابایت\n"
-                f"📅 شروع: {order.start_plane_at.strftime('%Y/%m/%d')}\n"
-                f"📅 پایان: {order.end_plane_at.strftime('%Y/%m/%d')}\n"
-                f"🔸 وضعیت: {status}\n\n"
-            )
+                    f"💰 قیمت: {order.plans.price:,} تومان\n"
+                    f"📊 حجم: {order.plans.in_volume} مگابایت\n"
+                    f"📅 شروع: {order.start_plane_at.strftime('%Y/%m/%d')}\n"
+                    f"📅 پایان: {order.end_plane_at.strftime('%Y/%m/%d')}\n"
+                    f"🔸 وضعیت: {status}\n\n"
+                )
         else:
             response += "❗ هیچ پلن پولی یافت نشد.\n\n"
         
@@ -969,25 +978,27 @@ async def my_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
         has_configs = False
         
         # بررسی کانفیگ تستی
-        trial_config = await sync_to_async(lambda: getattr(user, 'trial_config', None))()
-        if trial_config and not trial_config.is_expired():
-            has_configs = True
-            remaining_time = trial_config.get_remaining_time()
-            hours = int(remaining_time.total_seconds() // 3600)
-            minutes = int((remaining_time.total_seconds() % 3600) // 60)
-            
-            response += (
-                f"🎁 **کانفیگ تستی**\n"
-                f"⏰ اعتبار: {hours} ساعت و {minutes} دقیقه باقی\n"
-                f"🔧 کانفیگ: `{trial_config.config}`\n\n"
-            )
+        try:
+            trial_config = await sync_to_async(lambda: hasattr(user, 'trial_config') and user.trial_config)()
+            if trial_config and not await sync_to_async(trial_config.is_expired)():
+                has_configs = True
+                remaining_time = await sync_to_async(trial_config.get_remaining_time)()
+                hours = int(remaining_time.total_seconds() // 3600)
+                minutes = int((remaining_time.total_seconds() % 3600) // 60)
+                
+                response += (
+                    f"🎁 **کانفیگ تستی**\n"
+                    f"⏰ اعتبار: {hours} ساعت و {minutes} دقیقه باقی\n\n"
+                )
+        except:
+            pass
         
         # بررسی کانفیگ‌های X-UI
         xui_configs = await sync_to_async(list)(UserConfig.objects.filter(user=user, is_active=True))
         for config in xui_configs:
-            if not config.is_expired():
+            if not await sync_to_async(config.is_expired)():
                 has_configs = True
-                remaining_time = config.get_remaining_time()
+                remaining_time = await sync_to_async(config.get_remaining_time)()
                 if remaining_time:
                     hours = int(remaining_time.total_seconds() // 3600)
                     minutes = int((remaining_time.total_seconds() % 3600) // 60)
@@ -999,7 +1010,7 @@ async def my_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🔧 **{config.config_name}**\n"
                     f"🖥️ سرور: {config.server.name}\n"
                     f"⏰ اعتبار: {time_text}\n"
-                    f"🔧 کانفیگ: `{config.config_data}`\n\n"
+                    f"📋 کپی کنید: /copy_{config.id}\n\n"
                 )
         
         if configs:

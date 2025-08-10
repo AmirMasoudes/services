@@ -395,6 +395,96 @@ class XUIClientManager:
             print(f"خطا در ایجاد کانفیگ کاربر: {e}")
             return None
     
+    async def create_user_config_async(self, user: UsersModel, plan: ConfingPlansModel, inbound: XUIInbound) -> Optional[UserConfig]:
+        """ایجاد کانفیگ کاربر برای محیط async"""
+        from asgiref.sync import sync_to_async
+        
+        try:
+            # ایجاد تنظیمات کلاینت
+            email = f"{user.username_tel}_{user.telegram_id}"
+            client_settings = self.service.create_client_settings(
+                email=email,
+                total_gb=plan.traffic_gb,
+                expiry_days=plan.duration_days
+            )
+            
+            # اضافه کردن کلاینت به inbound
+            if self.service.add_client_to_inbound(inbound.xui_inbound_id, client_settings):
+                # ایجاد رکورد در دیتابیس
+                client_data = client_settings['clients'][0]
+                
+                # تولید کانفیگ واقعی از X-UI
+                config_data = self._generate_real_config_data(inbound, client_data)
+                
+                # استفاده از sync_to_async برای Django ORM
+                user_config = await sync_to_async(UserConfig.objects.create)(
+                    user=user,
+                    server=self.server,
+                    inbound=inbound,
+                    xui_inbound_id=inbound.xui_inbound_id,
+                    xui_user_id=client_data['id'],
+                    config_name=f"{user.full_name} - {plan.name}",
+                    config_data=config_data,
+                    is_active=True,
+                    expires_at=timezone.now() + timedelta(days=plan.duration_days),
+                    protocol=inbound.protocol,
+                    plan=plan,
+                    is_trial=False
+                )
+                
+                print(f"✅ کانفیگ کاربر {user.full_name} در X-UI ایجاد شد")
+                return user_config
+            
+            return None
+            
+        except Exception as e:
+            print(f"خطا در ایجاد کانفیگ کاربر: {e}")
+            return None
+    
+    def create_user_config_sync(self, user: UsersModel, plan: ConfingPlansModel, inbound: XUIInbound) -> Optional[UserConfig]:
+        """ایجاد کانفیگ کاربر برای محیط sync (بدون async)"""
+        try:
+            # ایجاد تنظیمات کلاینت
+            email = f"{user.username_tel}_{user.telegram_id}"
+            client_settings = self.service.create_client_settings(
+                email=email,
+                total_gb=plan.traffic_gb,
+                expiry_days=plan.duration_days
+            )
+            
+            # اضافه کردن کلاینت به inbound
+            if self.service.add_client_to_inbound(inbound.xui_inbound_id, client_settings):
+                # ایجاد رکورد در دیتابیس
+                client_data = client_settings['clients'][0]
+                
+                # تولید کانفیگ واقعی از X-UI
+                config_data = self._generate_real_config_data(inbound, client_data)
+                
+                # ایجاد مستقیم در دیتابیس (sync)
+                user_config = UserConfig.objects.create(
+                    user=user,
+                    server=self.server,
+                    inbound=inbound,
+                    xui_inbound_id=inbound.xui_inbound_id,
+                    xui_user_id=client_data['id'],
+                    config_name=f"{user.full_name} - {plan.name}",
+                    config_data=config_data,
+                    is_active=True,
+                    expires_at=timezone.now() + timedelta(days=plan.duration_days),
+                    protocol=inbound.protocol,
+                    plan=plan,
+                    is_trial=False
+                )
+                
+                print(f"✅ کانفیگ کاربر {user.full_name} در X-UI ایجاد شد")
+                return user_config
+            
+            return None
+            
+        except Exception as e:
+            print(f"خطا در ایجاد کانفیگ کاربر: {e}")
+            return None
+    
     def create_trial_config(self, user: UsersModel, inbound: XUIInbound) -> Optional[UserConfig]:
         """ایجاد کانفیگ تستی"""
         try:
@@ -407,6 +497,90 @@ class XUIClientManager:
             
             if self.service.add_client_to_inbound(inbound.xui_inbound_id, client_settings):
                 client_data = client_settings['clients'][0]
+                user_config = UserConfig.objects.create(
+                    user=user,
+                    server=self.server,
+                    inbound=inbound,
+                    xui_inbound_id=inbound.xui_inbound_id,
+                    xui_user_id=client_data['id'],
+                    config_name=f"{user.full_name} - تستی",
+                    config_data=self._generate_config_data(inbound, client_data),
+                    is_active=True,
+                    expires_at=timezone.now() + timedelta(days=1),
+                    protocol=inbound.protocol,
+                    is_trial=True
+                )
+                
+                # علامت‌گذاری استفاده از پلن تستی
+                user.has_used_trial = True
+                user.save()
+                
+                print(f"✅ کانفیگ تستی برای کاربر {user.full_name} ایجاد شد")
+                return user_config
+            
+            return None
+            
+        except Exception as e:
+            print(f"خطا در ایجاد کانفیگ تستی: {e}")
+            return None
+    
+    async def create_trial_config_async(self, user: UsersModel, inbound: XUIInbound) -> Optional[UserConfig]:
+        """ایجاد کانفیگ تستی برای محیط async"""
+        from asgiref.sync import sync_to_async
+        
+        try:
+            email = f"trial_{user.username_tel}_{user.telegram_id}"
+            client_settings = self.service.create_client_settings(
+                email=email,
+                total_gb=1,  # 1 GB برای تست
+                expiry_days=1  # 1 روز
+            )
+            
+            if self.service.add_client_to_inbound(inbound.xui_inbound_id, client_settings):
+                client_data = client_settings['clients'][0]
+                
+                # استفاده از sync_to_async برای Django ORM
+                user_config = await sync_to_async(UserConfig.objects.create)(
+                    user=user,
+                    server=self.server,
+                    inbound=inbound,
+                    xui_inbound_id=inbound.xui_inbound_id,
+                    xui_user_id=client_data['id'],
+                    config_name=f"{user.full_name} - تستی",
+                    config_data=self._generate_config_data(inbound, client_data),
+                    is_active=True,
+                    expires_at=timezone.now() + timedelta(days=1),
+                    protocol=inbound.protocol,
+                    is_trial=True
+                )
+                
+                # علامت‌گذاری استفاده از پلن تستی
+                user.has_used_trial = True
+                await sync_to_async(user.save)()
+                
+                print(f"✅ کانفیگ تستی برای کاربر {user.full_name} ایجاد شد")
+                return user_config
+            
+            return None
+            
+        except Exception as e:
+            print(f"خطا در ایجاد کانفیگ تستی: {e}")
+            return None
+    
+    def create_trial_config_sync(self, user: UsersModel, inbound: XUIInbound) -> Optional[UserConfig]:
+        """ایجاد کانفیگ تستی برای محیط sync (بدون async)"""
+        try:
+            email = f"trial_{user.username_tel}_{user.telegram_id}"
+            client_settings = self.service.create_client_settings(
+                email=email,
+                total_gb=1,  # 1 GB برای تست
+                expiry_days=1  # 1 روز
+            )
+            
+            if self.service.add_client_to_inbound(inbound.xui_inbound_id, client_settings):
+                client_data = client_settings['clients'][0]
+                
+                # ایجاد مستقیم در دیتابیس (sync)
                 user_config = UserConfig.objects.create(
                     user=user,
                     server=self.server,

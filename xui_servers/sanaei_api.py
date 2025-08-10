@@ -92,18 +92,42 @@ class SanaeiXUIAPI:
             if not self.ensure_login():
                 return []
             
-            response = self.session.get(
-                f"{self.base_url}/panel/api/inbounds/list",
-                timeout=30,
-                verify=False
-            )
+            # endpoint صحیح که کار می‌کند
+            endpoints_to_try = [
+                "/xui/API/inbounds/list",
+                "/inbounds/list",
+                "/panel/api/inbounds/list", 
+                "/inbounds",
+                "/api/inbounds"
+            ]
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success'):
-                    return data.get('obj', [])
+            response = None
+            for endpoint in endpoints_to_try:
+                try:
+                    response = self.session.get(
+                        f"{self.base_url}{endpoint}",
+                        timeout=30,
+                        verify=False
+                    )
+                    if response.status_code == 200 and response.text.strip():
+                        break
+                except:
+                    continue
             
-            print(f"❌ خطا در دریافت inbound ها: {response.status_code}")
+            if response and response.status_code == 200:
+                try:
+                    data = response.json()
+                    if data.get('success'):
+                        return data.get('obj', [])
+                    else:
+                        print(f"❌ API response not successful: {data}")
+                        return []
+                except ValueError as e:
+                    print(f"❌ JSON parse error: {e}, response: {response.text[:200]}")
+                    return []
+            
+            status_code = response.status_code if response else "No response"
+            print(f"❌ خطا در دریافت inbound ها: {status_code}")
             return []
             
         except Exception as e:
@@ -195,6 +219,49 @@ class SanaeiXUIAPI:
             print(f"خطا در ایجاد inbound: {e}")
             return None
     
+    def create_client_data(self, username: str, uuid: str = None, limit_ip: int = 0, total_gb_mb: int = 0, expiry_days: int = 0) -> Dict[str, Any]:
+        """ایجاد client data با format صحیح
+        
+        Args:
+            username (str): نام کاربری که به عنوان email و UUID استفاده می‌شود
+            uuid (str, optional): UUID دستی (اگر نخواهید از username استفاده کنید)
+            limit_ip (int): محدودیت IP (پیش‌فرض: 0 = بدون محدودیت)
+            total_gb_mb (int): محدودیت حجم به مگابایت (پیش‌فرض: 0 = بدون محدودیت)
+            expiry_days (int): روزهای انقضا (پیش‌فرض: 0 = بدون محدودیت)
+        
+        Returns:
+            Dict: client data آماده برای ارسال به X-UI
+        """
+        import uuid as uuid_module
+        from datetime import datetime, timedelta
+        
+        # اگر UUID مشخص نشده، از username استفاده کن
+        if not uuid:
+            uuid = username
+            
+        # محاسبه زمان انقضا
+        expiry_time = 0
+        if expiry_days > 0:
+            expiry_date = datetime.now() + timedelta(days=expiry_days)
+            expiry_time = int(expiry_date.timestamp() * 1000)  # میلی‌ثانیه
+            
+        client_data = {
+            "clients": [{
+                "id": uuid,
+                "flow": "",
+                "email": username,  # نام کاربری به عنوان email
+                "limitIp": limit_ip,
+                "totalGB": total_gb_mb * 1024 * 1024,  # تبدیل MB به byte
+                "expiryTime": expiry_time,
+                "enable": True,
+                "tgId": "",
+                "subId": "",
+                "comment": f"User: {username}, Limit: {total_gb_mb}MB, Days: {expiry_days}",
+                "reset": 0
+            }]
+        }
+        return client_data
+    
     def add_client_to_inbound(self, inbound_id: int, client_data: Dict[str, Any]) -> bool:
         """اضافه کردن کلاینت به inbound"""
         try:
@@ -202,14 +269,15 @@ class SanaeiXUIAPI:
                 return False
             
             # استفاده از API جدید برای اضافه کردن کلاینت
+            # تنظیم payload مطابق با format مورد نیاز X-UI
             payload = {
-                "id": inbound_id,
+                "id": str(inbound_id),
                 "settings": json.dumps(client_data)
             }
             
             response = self.session.post(
-                f"{self.base_url}/panel/api/inbounds/addClient",
-                json=payload,
+                f"{self.base_url}/panel/inbound/addClient",
+                data=payload,  # استفاده از data بجای json
                 timeout=30,
                 verify=False
             )
@@ -226,6 +294,63 @@ class SanaeiXUIAPI:
         except Exception as e:
             print(f"خطا در اضافه کردن کلاینت: {e}")
             return False
+    
+    def add_client(self, inbound_id: int, username: str, uuid: str = None, limit_ip: int = 0, total_gb_mb: int = 0, expiry_days: int = 0) -> bool:
+        """تابع آسان برای اضافه کردن کلاینت
+        
+        Args:
+            inbound_id (int): شناسه inbound
+            username (str): نام کاربری (به عنوان email و UUID استفاده می‌شود)
+            uuid (str, optional): UUID دستی
+            limit_ip (int): محدودیت IP
+            total_gb_mb (int): محدودیت حجم به مگابایت
+            expiry_days (int): روزهای انقضا
+            
+        Returns:
+            bool: موفقیت عملیات
+            
+        مثال:
+            api.add_client(2, "user123", total_gb_mb=1024, expiry_days=30)
+        """
+        client_data = self.create_client_data(username, uuid, limit_ip, total_gb_mb, expiry_days)
+        return self.add_client_to_inbound(inbound_id, client_data)
+    
+    def create_sample_clients(self, inbound_id: int) -> bool:
+        """ایجاد نمونه کلاینت‌ها برای تست"""
+        print("🔧 ایجاد نمونه کلاینت‌ها...")
+        
+        # نمونه 1: کلاینت با محدودیت حجم
+        success1 = self.add_client(
+            inbound_id=inbound_id,
+            username="user_1gb_30days", 
+            total_gb_mb=1024,  # 1 گیگابایت
+            expiry_days=30,    # 30 روز
+            limit_ip=1         # 1 IP
+        )
+        
+        # نمونه 2: کلاینت با محدودیت زمان
+        success2 = self.add_client(
+            inbound_id=inbound_id,
+            username="user_7days", 
+            total_gb_mb=0,     # بدون محدودیت حجم
+            expiry_days=7,     # 7 روز
+            limit_ip=2         # 2 IP
+        )
+        
+        # نمونه 3: کلاینت بدون محدودیت
+        success3 = self.add_client(
+            inbound_id=inbound_id,
+            username="user_unlimited", 
+            total_gb_mb=0,     # بدون محدودیت حجم
+            expiry_days=0,     # بدون محدودیت زمان
+            limit_ip=0         # بدون محدودیت IP
+        )
+        
+        results = [success1, success2, success3]
+        successful = sum(results)
+        print(f"✅ {successful}/3 کلاینت نمونه ایجاد شد")
+        
+        return all(results)
     
     def remove_client_from_inbound(self, inbound_id: int, email: str) -> bool:
         """حذف کلاینت از inbound"""

@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-c^1%va7g4+yqfygvbjku#d4-4d8-sw8rzw9!$_wq-vt(*x-mw9')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-very-secure-secret-key-with-more-than-50-characters-and-special-chars-!@#$%^&*()_+=-[]{}|;:,.<>?')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
@@ -241,3 +241,9 @@ WS_HOST = os.environ.get('WS_HOST', '')
 
 # تنظیمات امنیتی
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://time.amirprogrammer.ir,https://time.amirprogrammer.ir,http://156.244.31.37,https://156.244.31.37').split(',')
+
+# تنظیمات امنیتی اضافی برای production
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
+SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
+CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False').lower() == 'true'

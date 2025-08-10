@@ -71,3 +71,9 @@ class UsersModel(AbstractBaseUser, PermissionsMixin, BaseModel, SoftDeleteModel,
         """علامت‌گذاری استفاده از پلن تستی"""
         self.has_used_trial = True
         self.save()
+    
+    async def mark_trial_used_async(self):
+        """علامت‌گذاری استفاده از پلن تستی برای محیط async"""
+        from asgiref.sync import sync_to_async
+        self.has_used_trial = True
+        await sync_to_async(self.save)()
