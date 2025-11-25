@@ -160,12 +160,12 @@ REST_FRAMEWORK = {
 }
 
 # تنظیمات ربات ادمین
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '8450508816:AAFE6XAj8QvA9iIP12whrKxYRtgsoHFCiFU')
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '8496586253:AAFJLxxstDIqIOosPZ78V2ibdfMYlBNws1I')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ADMIN_USER_IDS = [int(x.strip()) for x in os.environ.get('ADMIN_USER_IDS', '123456789').split(',')]
 
 # تنظیمات ربات کاربران
-USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', '8202994859:AAGg68pT5HGR1W9D4pxqnAGeKoZKrD9Dnzs')
+USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', '8496586253:AAFJLxxstDIqIOosPZ78V2ibdfMYlBNws1I')
 
 # تنظیمات سرور X-UI
 XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'time.amirprogrammer.ir')
@@ -239,8 +239,14 @@ REALITY_PRIVATE_KEY = os.environ.get('REALITY_PRIVATE_KEY', 'YFgo8YQUJmqhu2yXL8r
 WS_PATH = os.environ.get('WS_PATH', '/')
 WS_HOST = os.environ.get('WS_HOST', '')
 
+# تنظیمات IP و سرور
+SERVER_IP = os.environ.get('SERVER_IP', '156.244.31.37')
+SERVER_DOMAIN = os.environ.get('SERVER_DOMAIN', 'time.amirprogrammer.ir')
+SERVER_PORT = int(os.environ.get('SERVER_PORT', '8000'))
+SERVER_PROTOCOL = os.environ.get('SERVER_PROTOCOL', 'http')
+
 # تنظیمات امنیتی
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://time.amirprogrammer.ir,https://time.amirprogrammer.ir,http://156.244.31.37,https://156.244.31.37').split(',')
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', f'http://{SERVER_DOMAIN},https://{SERVER_DOMAIN},http://{SERVER_IP},https://{SERVER_IP}').split(',')
 
 # تنظیمات امنیتی اضافی برای production
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
