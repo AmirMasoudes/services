@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from celery.schedules import crontab
 
 # Load environment variables from config.env
 load_dotenv('config.env')
@@ -160,12 +161,12 @@ REST_FRAMEWORK = {
 }
 
 # تنظیمات ربات ادمین
-ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '8496586253:AAFJLxxstDIqIOosPZ78V2ibdfMYlBNws1I')
+ADMIN_BOT_TOKEN = os.environ.get('ADMIN_BOT_TOKEN', '8496586253:AAEOjtvX8uYYjhUEUKVWxyQ8xDSqvF8DkQs')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ADMIN_USER_IDS = [int(x.strip()) for x in os.environ.get('ADMIN_USER_IDS', '123456789').split(',')]
 
 # تنظیمات ربات کاربران
-USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', '8496586253:AAFJLxxstDIqIOosPZ78V2ibdfMYlBNws1I')
+USER_BOT_TOKEN = os.environ.get('USER_BOT_TOKEN', '8496586253:AAEOjtvX8uYYjhUEUKVWxyQ8xDSqvF8DkQs')
 
 # تنظیمات سرور X-UI
 XUI_DEFAULT_HOST = os.environ.get('XUI_DEFAULT_HOST', 'time.amirprogrammer.ir')
@@ -194,6 +195,11 @@ MAX_PORT = int(os.environ.get('MAX_PORT', '65000'))
 # تنظیمات زمان انقضا
 TRIAL_HOURS = int(os.environ.get('TRIAL_HOURS', '24'))
 PAID_DAYS = int(os.environ.get('PAID_DAYS', '30'))
+EXPIRY_WARNING_HOURS = int(os.environ.get('EXPIRY_WARNING_HOURS', '6'))
+EXPIRY_WARNING_MESSAGE = os.environ.get(
+    'EXPIRY_WARNING_MESSAGE',
+    'کانفیگ شما تا {hours} ساعت دیگر منقضی می‌شود ⏰',
+)
 
 # تنظیمات امنیت
 TLS_ENABLED = os.environ.get('TLS_ENABLED', 'True').lower() == 'true'
@@ -253,3 +259,29 @@ SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False').lower() == 'true'
+
+# تنظیمات Celery
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+CELERY_BEAT_SCHEDULE = {
+    'check-expiring-configs-every-15-mins': {
+        'task': 'xui_servers.tasks.send_expiry_warnings',
+        'schedule': crontab(minute='*/15'),
+    },
+    'cleanup-expired-and-overused-every-10-mins': {
+        'task': 'xui_servers.tasks.cleanup_expired_and_overused',
+        'schedule': crontab(minute='*/10'),
+    },
+}
+
+# تنظیمات پنل S-UI (API v2)
+SUI_HOST = os.environ.get('SUI_HOST', 'localhost')
+SUI_PORT = int(os.environ.get('SUI_PORT', '2095'))
+SUI_USE_SSL = os.environ.get('SUI_USE_SSL', 'False').lower() == 'true'
+SUI_BASE_PATH = os.environ.get('SUI_BASE_PATH', '/app')
+SUI_API_TOKEN = os.environ.get('SUI_API_TOKEN', '')

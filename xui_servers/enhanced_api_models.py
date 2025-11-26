@@ -651,9 +651,33 @@ class XUIClientManager:
     def check_traffic_limits(self) -> int:
         """بررسی محدودیت‌های ترافیک"""
         try:
-            # این بخش نیاز به پیاده‌سازی کامل دارد
-            # فعلاً فقط کانفیگ‌های منقضی شده را بررسی می‌کنیم
-            return self.check_and_cleanup_expired_users()
+            from .models import XUIClient, UserConfig
+
+            cleaned = 0
+
+            # همه کلاینت‌های فعال را بررسی می‌کنیم
+            for client in XUIClient.objects.filter(is_active=True):
+                # اگر زمان انقضا در خود X-UI گذشته یا حجمش تمام شده
+                if client.is_expired() or client.get_remaining_gb() <= 0:
+                    # تمام کانفیگ‌های مرتبط با این کاربر و inbound را پیدا کن
+                    related_configs = UserConfig.objects.filter(
+                        is_active=True,
+                        user=client.user,
+                        inbound=client.inbound,
+                    )
+
+                    for cfg in related_configs:
+                        if self.delete_user_config(cfg):
+                            cleaned += 1
+
+                    # خود کلاینت را هم غیرفعال می‌کنیم
+                    client.is_active = False
+                    client.save(update_fields=["is_active"])
+
+            if cleaned:
+                print(f"✅ {cleaned} کانفیگ به دلیل اتمام حجم/ترافیک پاکسازی شد")
+
+            return cleaned
             
         except Exception as e:
             print(f"خطا در بررسی محدودیت‌های ترافیک: {e}")

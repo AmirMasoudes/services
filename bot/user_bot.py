@@ -1,12 +1,10 @@
 import os
-import django
-import datetime
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
-import os
 import sys
 import django
 import asyncio
+import datetime
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from dotenv import load_dotenv
 import logging
 from asgiref.sync import sync_to_async
@@ -1169,11 +1167,12 @@ async def back_to_configs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # اجرای ربات
 async def main():
-    # توکن را از متغیر محیطی یا فایل تنظیمات بخوانید
-    TOKEN = os.getenv('USER_BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+    # توکن را از Django settings بخوانید
+    from django.conf import settings
+    TOKEN = getattr(settings, 'USER_BOT_TOKEN', None)
     
-    if TOKEN == 'YOUR_BOT_TOKEN_HERE':
-        print("❌ لطفا توکن ربات را در فایل .env تنظیم کنید!")
+    if not TOKEN or TOKEN == 'YOUR_BOT_TOKEN_HERE':
+        print("[ERROR] لطفا توکن ربات را در فایل config.env تنظیم کنید!")
         print("مثال: USER_BOT_TOKEN=your_bot_token_here")
         return
 
@@ -1225,20 +1224,39 @@ async def main():
     # پردازش تایید پلن رایگان
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_free_plan_confirm))
 
-    print("🤖 ربات کاربر اجرا شد...")
-    await app.run_polling()
+    print("[*] ربات کاربر در حال اجرا...")
+    # برای Python 3.14 از start و start_polling استفاده می‌کنیم
+    # این روش event loop conflict ندارد
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(drop_pending_updates=True)
+    
+    # نگه داشتن ربات فعال تا Ctrl+C
+    try:
+        # ایجاد یک event برای نگه داشتن برنامه
+        stop_event = asyncio.Event()
+        await stop_event.wait()  # منتظر ماندن تا Ctrl+C
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # توقف ربات
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
 
 if __name__ == "__main__":
-    # Fix for Windows event loop
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
     try:
-        # Use nest_asyncio to fix the event loop issue
-        import nest_asyncio
-        nest_asyncio.apply()
+        # برای Python 3.14+ از asyncio.run استفاده می‌کنیم
+        # که خودش event loop را مدیریت می‌کند
+        import asyncio
+        
+        # اجرای مستقیم main function
+        # asyncio.run خودش event loop ایجاد می‌کند و مدیریت می‌کند
         asyncio.run(main())
+                
     except KeyboardInterrupt:
-        print("\n🤖 ربات متوقف شد...")
+        print("\n[*] ربات متوقف شد...")
     except Exception as e:
-        print(f"❌ خطا در اجرای ربات: {e}")
+        print(f"[ERROR] خطا در اجرای ربات: {e}")
+        import traceback
+        traceback.print_exc()

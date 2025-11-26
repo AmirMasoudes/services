@@ -10,17 +10,34 @@ import logging
 from datetime import datetime, timedelta
 from django.utils import timezone
 
+# اطمینان از اضافه شدن ریشه پروژه به مسیر پایتون
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 # تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from django.conf import settings
 from xui_servers.models import XUIServer, XUIInbound, XUIClient, UserConfig
 from accounts.models import UsersModel
+from plan.models import ConfingPlansModel
 from xui_servers.services import XUIService, UserConfigService
-from xui_servers.enhanced_api_models import XUIEnhancedService, XUIClientManager, XUIInboundManager, XUIAutoManager
+from xui_servers.enhanced_api_models import (
+    XUIEnhancedService,
+    XUIClientManager,
+    XUIInboundManager,
+    XUIAutoManager,
+)
 
 # تنظیم لاگینگ
 logging.basicConfig(
@@ -46,12 +63,14 @@ class AdminBot:
         self.application.add_handler(CommandHandler("login", self.login_command))
         self.application.add_handler(CommandHandler("logout", self.logout_command))
         self.application.add_handler(CommandHandler("dashboard", self.dashboard_command))
+        self.application.add_handler(CommandHandler("menu", self.menu_command))
         
         # دستورات مدیریت سرور
         self.application.add_handler(CommandHandler("servers", self.servers_command))
         self.application.add_handler(CommandHandler("inbounds", self.inbounds_command))
         self.application.add_handler(CommandHandler("clients", self.clients_command))
         self.application.add_handler(CommandHandler("users", self.users_command))
+        self.application.add_handler(CommandHandler("plans", self.plans_command))
         
         # دستورات مدیریت
         self.application.add_handler(CommandHandler("create_inbound", self.create_inbound_command))
@@ -82,7 +101,16 @@ class AdminBot:
         # اگر کاربر ادمین است، به صورت خودکار وارد شود
         context.user_data['logged_in'] = True
         context.user_data['login_time'] = datetime.now()
-        
+
+        # منوی اصلی به صورت دکمه‌ای
+        keyboard = [
+            [KeyboardButton("/dashboard"), KeyboardButton("/servers")],
+            [KeyboardButton("/plans"), KeyboardButton("/inbounds")],
+            [KeyboardButton("/clients"), KeyboardButton("/users")],
+            [KeyboardButton("/cleanup"), KeyboardButton("/check_expired")],
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
         await update.message.reply_text(
             "🔐 **ربات ادمین X-UI**\n\n"
             "✅ **ورود خودکار موفق!**\n\n"
@@ -95,10 +123,34 @@ class AdminBot:
             "➕ `/create_inbound` - ایجاد Inbound جدید\n"
             "🔗 `/assign_user` - تخصیص کاربر به Inbound\n"
             "🔄 `/sync_xui` - همگام‌سازی با X-UI\n"
+            "📦 `/plans` - مدیریت پلن‌های فروش\n"
             "🧹 `/cleanup` - پاکسازی خودکار\n"
             "⏰ `/check_expired` - بررسی کاربران منقضی شده\n"
             "🚪 `/logout` - خروج از سیستم",
-            parse_mode='Markdown'
+            parse_mode='Markdown',
+            reply_markup=reply_markup,
+        )
+
+    async def menu_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """نمایش منوی دکمه‌ای ادمین"""
+        user_id = update.effective_user.id
+
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ شما دسترسی ادمین ندارید!")
+            return
+
+        keyboard = [
+            [KeyboardButton("/dashboard"), KeyboardButton("/servers")],
+            [KeyboardButton("/plans"), KeyboardButton("/inbounds")],
+            [KeyboardButton("/clients"), KeyboardButton("/users")],
+            [KeyboardButton("/cleanup"), KeyboardButton("/check_expired")],
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text(
+            "📋 منوی اصلی ادمین:\n\n"
+            "یکی از دکمه‌های پایین را انتخاب کنید.",
+            reply_markup=reply_markup,
         )
     
     async def login_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -360,7 +412,39 @@ class AdminBot:
             
         except Exception as e:
             await update.message.reply_text(f"❌ خطا در دریافت کاربران: {e}")
-    
+
+    async def plans_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """مدیریت پلن‌های فروش"""
+        user_id = update.effective_user.id
+
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ شما دسترسی ادمین ندارید!")
+            return
+
+        if not context.user_data.get('logged_in'):
+            await update.message.reply_text("❌ لطفاً ابتدا وارد شوید: `/login`", parse_mode='Markdown')
+            return
+
+        try:
+            plans = ConfingPlansModel.objects.filter(is_active=True)
+
+            if not plans.exists():
+                await update.message.reply_text("❌ هیچ پلن فعالی یافت نشد!")
+                return
+
+            message_lines = ["📦 **لیست پلن‌های فعال:**\n"]
+            for plan in plans:
+                message_lines.append(
+                    f"• {plan.name}\n"
+                    f"  💰 قیمت: {plan.price} تومان\n"
+                    f"  📶 حجم: {plan.get_traffic_gb()} GB\n"
+                )
+
+            await update.message.reply_text("\n".join(message_lines), parse_mode='Markdown')
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ خطا در دریافت پلن‌ها: {e}")
+
     async def create_inbound_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """ایجاد Inbound جدید"""
         user_id = update.effective_user.id
@@ -675,7 +759,17 @@ class AdminBot:
     
     def run(self):
         """اجرای ربات"""
+        import asyncio
+
         logger.info("ربات ادمین شروع شد...")
+
+        # رفع مشکل event loop در ویندوز / Python 3.11
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
         self.application.run_polling()
 
 def main():
