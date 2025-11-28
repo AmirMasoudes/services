@@ -8,6 +8,7 @@ class ConfingPlansModel(BaseModel, TimeStampMixin, SoftDeleteModel):
     price = models.PositiveIntegerField()
     in_volume = models.PositiveIntegerField()
     traffic_mb = models.PositiveIntegerField(default=0, help_text="حجم داده به مگابایت")
+    duration_days = models.PositiveIntegerField(default=30, help_text="مدت زمان اعتبار به روز")
     is_active = models.BooleanField(default=True, help_text="آیا پلن فعال است؟")
     description = models.TextField(blank=True, null=True, help_text="توضیحات پلن")
     

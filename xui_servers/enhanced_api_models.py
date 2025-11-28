@@ -359,8 +359,8 @@ class XUIClientManager:
             email = f"{user.username_tel}_{user.telegram_id}"
             client_settings = self.service.create_client_settings(
                 email=email,
-                total_gb=plan.traffic_gb,
-                expiry_days=plan.duration_days
+                total_gb=plan.get_traffic_gb(),
+                expiry_days=getattr(plan, 'duration_days', 30)
             )
             
             # اضافه کردن کلاینت به inbound
@@ -380,7 +380,7 @@ class XUIClientManager:
                     config_name=f"{user.full_name} - {plan.name}",
                     config_data=config_data,
                     is_active=True,
-                    expires_at=timezone.now() + timedelta(days=plan.duration_days),
+                    expires_at=timezone.now() + timedelta(days=getattr(plan, 'duration_days', 30)),
                     protocol=inbound.protocol,
                     plan=plan,
                     is_trial=False
@@ -404,8 +404,8 @@ class XUIClientManager:
             email = f"{user.username_tel}_{user.telegram_id}"
             client_settings = self.service.create_client_settings(
                 email=email,
-                total_gb=plan.traffic_gb,
-                expiry_days=plan.duration_days
+                total_gb=plan.get_traffic_gb(),
+                expiry_days=getattr(plan, 'duration_days', 30)
             )
             
             # اضافه کردن کلاینت به inbound
@@ -426,7 +426,7 @@ class XUIClientManager:
                     config_name=f"{user.full_name} - {plan.name}",
                     config_data=config_data,
                     is_active=True,
-                    expires_at=timezone.now() + timedelta(days=plan.duration_days),
+                    expires_at=timezone.now() + timedelta(days=getattr(plan, 'duration_days', 30)),
                     protocol=inbound.protocol,
                     plan=plan,
                     is_trial=False
@@ -448,8 +448,8 @@ class XUIClientManager:
             email = f"{user.username_tel}_{user.telegram_id}"
             client_settings = self.service.create_client_settings(
                 email=email,
-                total_gb=plan.traffic_gb,
-                expiry_days=plan.duration_days
+                total_gb=plan.get_traffic_gb(),
+                expiry_days=getattr(plan, 'duration_days', 30)
             )
             
             # اضافه کردن کلاینت به inbound
@@ -470,7 +470,7 @@ class XUIClientManager:
                     config_name=f"{user.full_name} - {plan.name}",
                     config_data=config_data,
                     is_active=True,
-                    expires_at=timezone.now() + timedelta(days=plan.duration_days),
+                    expires_at=timezone.now() + timedelta(days=getattr(plan, 'duration_days', 30)),
                     protocol=inbound.protocol,
                     plan=plan,
                     is_trial=False
