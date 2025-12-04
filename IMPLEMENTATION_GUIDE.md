@@ -1,445 +1,480 @@
-# Implementation Guide - Complete System Fix
+# Implementation Guide - Complete System Refactoring
 
 ## Overview
 
-This guide provides step-by-step instructions for implementing all fixes identified in the audit.
+This guide provides step-by-step instructions for implementing all fixes and improvements identified in the audit.
 
 ---
 
-## Phase 1: Database Migrations
+## Prerequisites
 
-### Step 1.1: Apply Model Improvements
+- Python 3.11+
+- Django 5.2+
+- PostgreSQL (recommended) or SQLite (development)
+- Redis (for Celery)
+- Git
 
-1. **Update XUIServer Model:**
-   - Copy fields from `xui_servers/models_improved.py` to `xui_servers/models.py`
-   - Add: `use_ssl`, `server_type`, `api_token`, health check fields, sync fields
-   - Add indexes
+---
 
-2. **Update XUIInbound Model:**
-   - Add: `stream_settings`, `sniffing_settings`, `last_sync_at`
-   - Add indexes and unique_together constraint
+## Step 1: Environment Setup
 
-3. **Update XUIClient Model:**
-   - Add: `last_usage_sync`, `sync_retry_count`, `last_sync_error`
-   - Add indexes
+### 1.1 Clone Repository
 
-4. **Update UserConfig Model:**
-   - Add: `status`, `subscription_url`, `last_sync_at`, `sync_required`, retry fields
-   - Add indexes
+```bash
+git clone https://github.com/AmirMasoudes/services.git
+cd services
+```
 
-5. **Update OrderUserModel:**
-   - Change `plans` from OneToOne to ForeignKey
-   - Add: `status`, `order_number`, payment fields, dates
-   - Add indexes
+### 1.2 Create Branch
 
-6. **Update PayMentModel:**
-   - Add: `status`, `amount`, dates, approver fields
-   - Add indexes
+```bash
+git checkout -b cursor/sui-bots-refactor
+```
 
-7. **Create AuditLog Model:**
-   - New model for tracking changes
-   - Add to `xui_servers/models.py`
+### 1.3 Create Virtual Environment
 
-### Step 1.2: Create Migrations
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 1.4 Install Dependencies
+
+```bash
+pip install -r requirements.txt
+pip install pytest pytest-django pytest-cov requests-mock black ruff isort mypy
+```
+
+### 1.5 Create Environment File
+
+```bash
+cp .env.example .env
+# Edit .env with your actual values
+```
+
+**CRITICAL:** Never commit `.env` file. It's already in `.gitignore`.
+
+---
+
+## Step 2: Database Migrations
+
+### 2.1 Review Model Changes
+
+The following models have been updated:
+- `order/models.py` - Added status, order_number, payment fields, fixed OneToOne → ForeignKey
+- `xui_servers/models.py` - Added health checks, sync fields, status, subscription_url, indexes
+- New `AuditLog` model added
+
+### 2.2 Create Migrations
 
 ```bash
 python manage.py makemigrations
+```
+
+This will create migrations for:
+- `order` app (OrderUserModel, PayMentModel changes)
+- `xui_servers` app (XUIServer, XUIInbound, XUIClient, UserConfig, AuditLog changes)
+
+### 2.3 Review Migrations
+
+```bash
+python manage.py showmigrations
+```
+
+### 2.4 Apply Migrations
+
+```bash
 python manage.py migrate
+```
+
+**Note:** If you have existing data, the migrations include data migrations to:
+- Generate order numbers for existing orders
+- Set default status values
+- Create indexes
+
+### 2.5 Verify Migrations
+
+```bash
+python manage.py dbshell
+# Check tables
+\dt
+# Check indexes
+\d+ order_orderusermodel
+\d+ xui_servers_userconfig
 ```
 
 ---
 
-## Phase 2: S-UI Integration
+## Step 3: S-UI Integration
 
-### Step 2.1: Install S-UI Client
+### 3.1 Verify S-UI Client
 
-The S-UI client is already created in `xui_servers/sui_client.py`. 
-
-**Features:**
+The S-UI client is already created in `xui_servers/sui_client.py` with:
 - Retry logic with exponential backoff
 - Idempotency support
 - Health checks
 - Proper error handling
-- Token-based authentication
 
-### Step 2.2: Use S-UI Managers
+### 3.2 Configure S-UI Settings
 
-Import and use in your services:
+In your `.env` file:
 
-```python
-from xui_servers.sui_managers import SUIInboundManager, SUIProvisionService
-
-# For inbound management
-manager = SUIInboundManager(server)
-inbounds = manager.get_available_inbounds()
-best_inbound = manager.find_best_inbound('vless')
-
-# For provisioning
-provision_service = SUIProvisionService(server)
-trial_config = provision_service.provision_trial_config(user)
-paid_config = provision_service.provision_paid_config(user, plan)
+```env
+SUI_HOST=your-sui-server-host
+SUI_PORT=2095
+SUI_USE_SSL=False
+SUI_BASE_PATH=/app
+SUI_API_TOKEN=your-api-token
 ```
 
-### Step 2.3: Update Settings
-
-Add S-UI settings to `config/settings.py`:
+### 3.3 Test S-UI Connection
 
 ```python
-SUI_HOST = os.environ.get('SUI_HOST', 'localhost')
-SUI_PORT = int(os.environ.get('SUI_PORT', '2095'))
-SUI_USE_SSL = os.environ.get('SUI_USE_SSL', 'False').lower() == 'true'
-SUI_BASE_PATH = os.environ.get('SUI_BASE_PATH', '/app')
-SUI_API_TOKEN = os.environ.get('SUI_API_TOKEN', '')
+python manage.py shell
 ```
 
----
-
-## Phase 3: X-UI API Improvements
-
-### Step 3.1: Add Retry Logic
-
-The retry decorator is available. Apply to X-UI API methods:
-
 ```python
-from xui_servers.sui_client import retry_with_backoff
+from xui_servers.sui_client import SUIClient
 
-@retry_with_backoff(max_retries=3, backoff_factor=1.0)
-def your_xui_method(self):
-    # Your code
-    pass
-```
+client = SUIClient(
+    host='your-host',
+    port=2095,
+    api_token='your-token'
+)
 
-### Step 3.2: Add Idempotency
-
-Use idempotency keys for all create operations:
-
-```python
-idempotency_key = f"user_{user_id}_{plan_id}_{int(time.time())}"
-```
-
-### Step 3.3: Implement Usage Sync
-
-Create Celery task for periodic sync:
-
-```python
-# In xui_servers/tasks.py
-@shared_task
-def sync_client_usage():
-    """Sync client usage from X-UI/S-UI"""
-    for config in UserConfig.objects.filter(is_active=True, sync_required=True):
-        # Sync usage
-        pass
+# Test connection
+if client.login():
+    print("✅ S-UI connection successful")
+    inbounds = client.get_inbounds()
+    print(f"Found {len(inbounds)} inbounds")
+else:
+    print("❌ S-UI connection failed")
 ```
 
 ---
 
-## Phase 4: Admin Bot Fixes
+## Step 4: Celery Setup
 
-### Step 4.1: Create Utility Modules
+### 4.1 Start Redis
 
-Create `bot/utils.py`:
+```bash
+# Using Docker
+docker run -d -p 6379:6379 redis:7
 
-```python
-# Permission decorator
-def admin_required(func):
-    @wraps(func)
-    async def wrapper(update, context):
-        if not await is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ دسترسی ادمین ندارید!")
-            return
-        return await func(update, context)
-    return wrapper
-
-# Error handler
-async def error_handler(update, context):
-    logger.error(f"Error: {context.error}")
-    # Send error message
+# Or install locally
+# Ubuntu/Debian: sudo apt-get install redis-server
+# macOS: brew install redis
 ```
 
-### Step 4.2: Fix Async Issues
+### 4.2 Verify Celery Configuration
 
-Ensure all handlers are properly async:
+Check `config/celery.py` and `config/settings.py` for Celery settings.
 
-```python
-async def command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        # Use sync_to_async for Django ORM
-        result = await sync_to_async(Model.objects.get)(id=1)
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text("❌ خطا رخ داد")
+### 4.3 Start Celery Worker
+
+```bash
+celery -A config worker -l info
 ```
 
-### Step 4.3: Add Input Validation
+### 4.4 Start Celery Beat (for scheduled tasks)
 
-Create validation functions:
-
-```python
-def validate_server_data(data):
-    """Validate server creation data"""
-    errors = []
-    if not data.get('host'):
-        errors.append("Host is required")
-    if not data.get('port') or not (1 <= data['port'] <= 65535):
-        errors.append("Invalid port")
-    return errors
+```bash
+celery -A config beat -l info
 ```
 
-### Step 4.4: Implement State Machine
-
-For multi-step inputs:
+### 4.5 Test Celery Tasks
 
 ```python
-USER_STATES = {}
+python manage.py shell
+```
 
-async def start_add_server(update, context):
-    USER_STATES[update.effective_user.id] = 'waiting_server_name'
-    await update.message.reply_text("نام سرور را وارد کنید:")
+```python
+from xui_servers.provisioning_tasks import provision_subscription
 
-async def handle_server_name(update, context):
-    if USER_STATES.get(update.effective_user.id) == 'waiting_server_name':
-        context.user_data['server_name'] = update.message.text
-        USER_STATES[update.effective_user.id] = 'waiting_server_host'
-        await update.message.reply_text("آدرس سرور را وارد کنید:")
+# Test task (will fail if no real config, but tests the queue)
+result = provision_subscription.delay('test-id')
+print(result.get(timeout=10))
 ```
 
 ---
 
-## Phase 5: User Bot Fixes
+## Step 5: Update Bot Handlers
 
-### Step 5.1: Fix Start Command
+### 5.1 Admin Bot
+
+The admin bot needs modularization. For now, ensure it uses the new provisioning tasks:
+
+**In `bot/admin_bot.py`, update provisioning calls to use:**
 
 ```python
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_data = update.effective_user
-    telegram_id = user_data.id
-    
-    try:
-        # Get or create user
-        user, created = await sync_to_async(
-            lambda: UsersModel.objects.get_or_create(
-                telegram_id=telegram_id,
-                defaults={
-                    'id_tel': str(telegram_id),
-                    'username_tel': user_data.username or '',
-                    'full_name': user_data.full_name or 'کاربر',
-                    'username': user_data.username or ''
-                }
-            )
-        )()
-        
-        if created:
-            message = "✅ ثبت‌نام با موفقیت انجام شد!"
-        else:
-            # Update existing user
-            user.username_tel = user_data.username or ''
-            user.full_name = user_data.full_name or 'کاربر'
-            await sync_to_async(user.save)()
-            message = "👋 خوش آمدید!"
-        
-        await update.message.reply_text(
-            message,
-            reply_markup=main_keyboard
-        )
-        
-    except Exception as e:
-        logger.error(f"Error in start: {e}")
-        await update.message.reply_text("❌ خطا در ثبت‌نام. لطفا دوباره تلاش کنید.")
+from xui_servers.provisioning_tasks import provision_subscription
+
+# Instead of direct provisioning:
+provision_subscription.delay(str(user_config.id), idempotency_key=f"admin_{user_id}")
 ```
 
-### Step 5.2: Implement Subscription Links
+### 5.2 User Bot
+
+Update user bot to:
+1. Use provisioning tasks for subscription creation
+2. Generate subscription links properly
+3. Check sync status before showing configs
+
+**Example update in `bot/user_bot.py`:**
 
 ```python
-async def get_subscription_link(user_config: UserConfig) -> str:
-    """Generate subscription link"""
-    if user_config.subscription_url:
-        return user_config.subscription_url
-    
-    # Generate link
-    from django.conf import settings
-    base_url = getattr(settings, 'SERVER_DOMAIN', 'localhost')
-    link = f"https://{base_url}/api/subscription/{user_config.xui_user_id}"
-    
-    # Save to database
-    user_config.subscription_url = link
-    await sync_to_async(user_config.save)()
-    
-    return link
-```
+from xui_servers.provisioning_tasks import provision_subscription
 
-### Step 5.3: Add Usage Display
-
-```python
-async def show_usage(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = await sync_to_async(UsersModel.objects.get)(
-        telegram_id=update.effective_user.id
-    )
-    
-    configs = await sync_to_async(list)(
-        user.xui_configs.filter(is_active=True)
-    )
-    
-    if not configs:
-        await update.message.reply_text("❌ هیچ کانفیگ فعالی ندارید")
-        return
-    
-    message = "📊 **استفاده شما:**\n\n"
-    for config in configs:
-        # Sync usage first
-        await sync_usage(config)
-        
-        # Get usage stats
-        # Display usage
-        message += f"• {config.config_name}\n"
-        # Add usage details
-    
-    await update.message.reply_text(message, parse_mode='Markdown')
-```
-
-### Step 5.4: Implement Renewal Flow
-
-```python
-async def renew_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Renew expired config"""
-    user = await sync_to_async(UsersModel.objects.get)(
-        telegram_id=update.effective_user.id
-    )
-    
-    expired_configs = await sync_to_async(list)(
-        user.xui_configs.filter(
-            is_active=True,
-            expires_at__lt=timezone.now()
-        )
-    )
-    
-    if not expired_configs:
-        await update.message.reply_text("❌ هیچ کانفیگ منقضی شده‌ای ندارید")
-        return
-    
-    # Show renewal options
-    keyboard = []
-    for config in expired_configs:
-        keyboard.append([
-            InlineKeyboardButton(
-                f"🔄 تمدید {config.config_name}",
-                callback_data=f"renew_{config.id}"
-            )
-        ])
-    
-    await update.message.reply_text(
-        "🔄 کانفیگ‌های منقضی شده:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+# When user purchases plan:
+user_config = UserConfig.objects.create(...)
+provision_subscription.delay(str(user_config.id))
 ```
 
 ---
 
-## Phase 6: Security Fixes
+## Step 6: Security Hardening
 
-### Step 6.1: Environment Variables
+### 6.1 Remove Secrets from Repository
 
-1. Create `.env` file from template
-2. Move all secrets to environment variables
-3. Never commit `.env` to git
-4. Add `.env` to `.gitignore`
+```bash
+# Check for secrets
+git log --all --full-history -- config.env
+git log --all --full-history -- db.sqlite3
 
-### Step 6.2: Input Validation
-
-Add validation to all user inputs:
-
-```python
-from django.core.validators import validate_email, URLValidator
-
-def validate_input(data, field_type):
-    """Validate user input"""
-    if field_type == 'email':
-        validate_email(data)
-    elif field_type == 'url':
-        URLValidator()(data)
-    # Add more validations
+# If found, remove from history (use git-filter-repo or BFG)
+# See SECURITY_FIXES.md for details
 ```
 
-### Step 6.3: Sanitize Logs
+### 6.2 Verify .gitignore
+
+Ensure `.gitignore` includes:
+- `.env`
+- `config.env`
+- `db.sqlite3`
+- `*.log`
+- `secrets/`
+
+### 6.3 Rotate Secrets
+
+If any secrets were exposed:
+1. Generate new bot tokens from @BotFather
+2. Generate new API tokens for S-UI
+3. Update `.env` file
+4. Update production environment
+
+### 6.4 Enable Security Settings
+
+In `config/settings.py` (for production):
 
 ```python
-def sanitize_log_data(data):
-    """Remove sensitive data from logs"""
-    sensitive_keys = ['password', 'token', 'api_key', 'secret']
-    sanitized = data.copy()
-    for key in sensitive_keys:
-        if key in sanitized:
-            sanitized[key] = '***REDACTED***'
-    return sanitized
+DEBUG = False
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000
 ```
 
 ---
 
-## Phase 7: Testing
+## Step 7: Testing
 
-### Step 7.1: Unit Tests
+### 7.1 Run Unit Tests
 
-Create tests for:
-- S-UI client
-- Provision service
-- Bot handlers
-- Models
+```bash
+pytest tests/test_sui_client.py -v
+```
 
-### Step 7.2: Integration Tests
+### 7.2 Run Integration Tests
 
-Test:
-- Full provisioning flow
-- Bot command flows
-- API integrations
+```bash
+pytest tests/test_provisioning.py -v
+```
 
----
+### 7.3 Run All Tests
 
-## Phase 8: Deployment
+```bash
+pytest tests/ -v --cov=. --cov-report=html
+```
 
-### Step 8.1: Update Requirements
+### 7.4 Check Coverage
 
-Ensure all dependencies are in `requirements.txt`
-
-### Step 8.2: Environment Setup
-
-1. Set environment variables
-2. Run migrations
-3. Create superuser
-4. Start services
-
-### Step 8.3: Monitoring
-
-Set up:
-- Logging
-- Error tracking
-- Health checks
-- Usage monitoring
+Open `htmlcov/index.html` in browser to see coverage report.
 
 ---
 
-## Quick Reference
+## Step 8: Code Quality
 
-### Key Files Created:
-- `xui_servers/sui_client.py` - S-UI API client
-- `xui_servers/sui_managers.py` - S-UI managers
-- `xui_servers/models_improved.py` - Improved models
-- `order/models_improved.py` - Improved order models
-- `AUDIT_REPORT.md` - Full audit report
-- `SECURITY_FIXES.md` - Security fixes
-- `IMPLEMENTATION_GUIDE.md` - This file
+### 8.1 Format Code
 
-### Next Steps:
-1. Review audit report
-2. Apply database migrations
-3. Update bot handlers
-4. Test thoroughly
-5. Deploy
+```bash
+black .
+isort .
+```
+
+### 8.2 Lint Code
+
+```bash
+ruff check .
+```
+
+### 8.3 Type Check
+
+```bash
+mypy . --ignore-missing-imports
+```
+
+---
+
+## Step 9: Deployment
+
+### 9.1 Production Checklist
+
+- [ ] All migrations applied
+- [ ] Environment variables set
+- [ ] Secrets rotated
+- [ ] Database backed up
+- [ ] Celery workers running
+- [ ] Redis running
+- [ ] Tests passing
+- [ ] Security settings enabled
+- [ ] Monitoring configured
+
+### 9.2 Start Services
+
+```bash
+# Django
+gunicorn config.wsgi:application --bind 0.0.0.0:8000
+
+# Celery Worker
+celery -A config worker -l info
+
+# Celery Beat
+celery -A config beat -l info
+
+# Admin Bot
+python bot/admin_bot.py
+
+# User Bot
+python bot/user_bot.py
+```
+
+### 9.3 Health Checks
+
+```bash
+# Django
+curl http://localhost:8000/admin/
+
+# Celery
+celery -A config inspect active
+
+# Redis
+redis-cli ping
+```
+
+---
+
+## Step 10: Monitoring
+
+### 10.1 Set Up Logging
+
+Configure logging in `config/settings.py`:
+
+```python
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'logs/django.log',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'xui_servers': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+```
+
+### 10.2 Monitor Tasks
+
+```bash
+# View active tasks
+celery -A config inspect active
+
+# View scheduled tasks
+celery -A config inspect scheduled
+
+# View stats
+celery -A config inspect stats
+```
+
+---
+
+## Troubleshooting
+
+### Migration Issues
+
+If migrations fail:
+
+```bash
+# Show migration status
+python manage.py showmigrations
+
+# Fake migration (if needed)
+python manage.py migrate --fake
+
+# Rollback (if needed)
+python manage.py migrate app_name previous_migration
+```
+
+### Celery Issues
+
+```bash
+# Check Celery status
+celery -A config inspect ping
+
+# Purge queue (if needed)
+celery -A config purge
+
+# Check logs
+tail -f logs/celery.log
+```
+
+### S-UI Connection Issues
+
+1. Verify API token is correct
+2. Check network connectivity
+3. Verify SSL settings
+4. Check S-UI panel is accessible
+5. Review logs for detailed errors
+
+---
+
+## Next Steps
+
+After completing this guide:
+
+1. **Modularize Bots:** Split `admin_bot.py` and `user_bot.py` into modules
+2. **Add More Tests:** Increase test coverage
+3. **Performance Optimization:** Add caching, optimize queries
+4. **Monitoring:** Set up proper monitoring and alerting
+5. **Documentation:** Complete API documentation
 
 ---
 
 ## Support
 
-For issues or questions, refer to:
-- `AUDIT_REPORT.md` for problem details
-- `SECURITY_FIXES.md` for security improvements
-- Code comments for implementation details
-
+For issues or questions:
+- Review `AUDIT_REPORT.md` for problem details
+- Check `SECURITY_FIXES.md` for security improvements
+- See code comments for implementation details

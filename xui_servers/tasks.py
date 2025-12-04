@@ -8,6 +8,15 @@ from accounts.models import UsersModel
 from .models import UserConfig, XUIServer
 from .enhanced_api_models import XUIAutoManager
 
+# Import provisioning tasks
+from .provisioning_tasks import (
+    provision_subscription,
+    revoke_subscription,
+    sync_server_stats,
+    sync_client_usage,
+    process_paid_order,
+)
+
 
 @shared_task
 def send_expiry_warnings() -> int:
