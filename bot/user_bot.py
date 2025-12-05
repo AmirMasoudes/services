@@ -13,8 +13,19 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 from datetime import timedelta
 
-# Load environment variables
-load_dotenv('config.env')
+# Load environment variables from root .env file
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_FILE = os.path.join(BASE_DIR, '.env')
+CONFIG_ENV_FILE = os.path.join(BASE_DIR, 'config.env')
+
+# Try to load from root .env first, fallback to config.env for backward compatibility
+if os.path.exists(ENV_FILE):
+    load_dotenv(ENV_FILE)
+elif os.path.exists(CONFIG_ENV_FILE):
+    load_dotenv(CONFIG_ENV_FILE)
+else:
+    # Try to load from current directory
+    load_dotenv()
 
 # اضافه کردن مسیر پروژه به sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,32 +49,23 @@ from xui_servers.enhanced_api_models import (
 )
 from django.conf import settings
 
+# Import shared utilities
+from bot.shared.decorators import error_handler, admin_required, user_required, is_admin as check_is_admin
+from bot.shared.errors import handle_error, UserNotFoundError, ConfigNotFoundError, PlanNotFoundError, ServerError
+from bot.user.services import UserBotService
+
 # تنظیم لاگینگ
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # حالت‌های مختلف کاربر
 USER_STATES = {}
 
-# بررسی دسترسی ادمین
-async def is_admin(user_id):
-    """بررسی دسترسی ادمین - از دیتابیس و تنظیمات"""
-    # چک کردن از تنظیمات
-    ADMIN_USER_IDS = getattr(settings, 'ADMIN_USER_IDS', [])
-    if user_id in ADMIN_USER_IDS:
-        return True
-    
-    # چک کردن از دیتابیس
-    try:
-        user = await sync_to_async(UsersModel.objects.get)(telegram_id=user_id)
-        if user.is_admin or user.is_staff:
-            return True
-    except UsersModel.DoesNotExist:
-        pass
-    except Exception as e:
-        logger.error(f"خطا در بررسی دسترسی ادمین: {e}")
-    
-    return False
+# بررسی دسترسی ادمین - استفاده از تابع از shared
+# Note: is_admin function is now imported from bot.shared.decorators as check_is_admin
 
 # دکمه‌های کیبورد اصلی
 main_keyboard = ReplyKeyboardMarkup([
@@ -479,31 +481,15 @@ async def back_to_start_tutorial(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 # دستور start - بهبود شده با راهنما
+@error_handler
+@user_required
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = update.effective_user
     telegram_id = user_data.id
     
     try:
-        # بررسی وجود کاربر با sync_to_async
-        try:
-            user = await sync_to_async(UsersModel.objects.get)(telegram_id=telegram_id)
-            created = False
-            # به‌روزرسانی اطلاعات کاربر
-            user.id_tel = str(user_data.id)
-            user.username_tel = user_data.username or ""
-            user.full_name = user_data.full_name or user_data.first_name or "کاربر"
-            user.username = user_data.username or ""
-            await sync_to_async(user.save)()
-        except UsersModel.DoesNotExist:
-            # ایجاد کاربر جدید
-            user = await sync_to_async(UsersModel.objects.create)(
-                telegram_id=telegram_id,
-                id_tel=str(user_data.id),
-                username_tel=user_data.username or "",
-                full_name=user_data.full_name or user_data.first_name or "کاربر",
-                username=user_data.username or ""
-            )
-            created = True
+        # Use service to get or create user
+        user, created = await UserBotService.get_or_create_user(telegram_id, user_data)
         
         if created:
             # اگر کاربر جدید است
@@ -603,10 +589,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
         else:
             # اگر کاربر قبلی است
-            trial_status = "✅ در دسترس" if user.can_get_trial() else "❌ استفاده شده"
+            can_trial = await UserBotService.can_get_trial(user)
+            trial_status = "✅ در دسترس" if can_trial else "❌ استفاده شده"
             
             # بررسی دسترسی ادمین
-            if await is_admin(telegram_id):
+            if await check_is_admin(telegram_id):
                 welcome_message = (
                     f"🔁 خوش برگشتی {user.full_name}!\n\n"
                     f"🆔 شناسه تلگرام: {telegram_id}\n"
@@ -646,8 +633,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
     except Exception as e:
-        logger.error(f"خطا در ثبت‌نام: {e}")
-        await update.message.reply_text("❌ خطا در ثبت‌نام. لطفا دوباره تلاش کنید.")
+        await handle_error(update, context, e, "❌ خطا در ثبت‌نام. لطفا دوباره تلاش کنید.")
 
 # نمایش پروفایل - بهبود شده
 # اطلاعات من - نمایش اطلاعات کاربر

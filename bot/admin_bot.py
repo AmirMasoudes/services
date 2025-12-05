@@ -24,6 +24,22 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+# Load environment variables from root .env file
+try:
+    from dotenv import load_dotenv
+    ENV_FILE = os.path.join(BASE_DIR, '.env')
+    CONFIG_ENV_FILE = os.path.join(BASE_DIR, 'config.env')
+    
+    # Try to load from root .env first, fallback to config.env for backward compatibility
+    if os.path.exists(ENV_FILE):
+        load_dotenv(ENV_FILE)
+    elif os.path.exists(CONFIG_ENV_FILE):
+        load_dotenv(CONFIG_ENV_FILE)
+    else:
+        load_dotenv()
+except ImportError:
+    pass  # dotenv not available, will use Django settings
+
 # تنظیم Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()

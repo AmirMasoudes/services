@@ -4,6 +4,12 @@ Application configuration using Pydantic Settings
 from pydantic_settings import BaseSettings
 from typing import List
 from functools import lru_cache
+from pathlib import Path
+import os
+
+# Get project root directory (two levels up from this file)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -20,7 +26,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = ""
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
     
@@ -29,7 +35,7 @@ class Settings(BaseSettings):
     REDIS_CACHE_TTL: int = 3600
     
     # JWT
-    SECRET_KEY: str
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -43,6 +49,8 @@ class Settings(BaseSettings):
     TELEGRAM_ADMIN_ID: str = ""
     
     # S-UI Panel
+    SUI_BASE_URL: str = "http://localhost:2095"
+    SUI_API_KEY: str = ""
     SUI_DEFAULT_TIMEOUT: int = 30
     SUI_MAX_RETRIES: int = 3
     
@@ -59,8 +67,19 @@ class Settings(BaseSettings):
     MAX_PAGE_SIZE: int = 100
     
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE) if ENV_FILE.exists() else ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
+        
+    def __init__(self, **kwargs):
+        """Initialize settings with validation"""
+        super().__init__(**kwargs)
+        
+        # Validate required fields
+        if not self.SECRET_KEY:
+            raise ValueError("SECRET_KEY is required. Please set it in .env file")
+        if not self.DATABASE_URL:
+            raise ValueError("DATABASE_URL is required. Please set it in .env file")
 
 
 @lru_cache()

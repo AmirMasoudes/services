@@ -15,11 +15,22 @@ import os
 from dotenv import load_dotenv
 from celery.schedules import crontab
 
-# Load environment variables from config.env
-load_dotenv('config.env')
+# Load environment variables from root .env file
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE = BASE_DIR / ".env"
+CONFIG_ENV_FILE = BASE_DIR / "config.env"
+
+# Try to load from root .env first, fallback to config.env for backward compatibility
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+elif CONFIG_ENV_FILE.exists():
+    load_dotenv(CONFIG_ENV_FILE)
+else:
+    # Try to load from current directory
+    load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+# BASE_DIR is already set above for env loading
 
 
 # Quick-start development settings - unsuitable for production
@@ -90,12 +101,40 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database configuration from environment
+DB_ENGINE = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
+DB_NAME = os.environ.get('DB_NAME', str(BASE_DIR / 'db.sqlite3'))
+DB_USER = os.environ.get('DB_USER', '')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
+DB_HOST = os.environ.get('DB_HOST', '')
+DB_PORT = os.environ.get('DB_PORT', '')
+
+if DB_ENGINE == 'django.db.backends.sqlite3':
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': DB_NAME,
+        }
     }
-}
+elif DB_ENGINE in ['django.db.backends.postgresql', 'django.db.backends.postgresql_psycopg2']:
+    DATABASES = {
+        'default': {
+            'ENGINE': DB_ENGINE,
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST or 'localhost',
+            'PORT': DB_PORT or '5432',
+        }
+    }
+else:
+    # Default to SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
