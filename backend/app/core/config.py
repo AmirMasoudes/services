@@ -78,8 +78,7 @@ class Settings(BaseSettings):
         # Validate required fields
         if not self.SECRET_KEY:
             raise ValueError("SECRET_KEY is required. Please set it in .env file")
-        if not self.DATABASE_URL:
-            raise ValueError("DATABASE_URL is required. Please set it in .env file")
+        # DATABASE_URL is optional - will use SQLite fallback if not set
 
 
 @lru_cache()

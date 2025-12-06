@@ -39,13 +39,21 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Sales Panel Backend...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"Database: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'}")
+    if settings.DATABASE_URL:
+        db_info = settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'
+        logger.info(f"Database: {db_info}")
+    else:
+        logger.info("Database: SQLite (fallback)")
     
     # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+        logger.warning("Continuing without database initialization")
     
-    logger.info("Database tables initialized")
     logger.info("Application started successfully")
     
     yield

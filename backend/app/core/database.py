@@ -6,13 +6,25 @@ from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
 # Create async engine
-engine = create_async_engine(
-    settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://"),
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    echo=settings.DEBUG,
-)
+# Handle empty DATABASE_URL gracefully
+if settings.DATABASE_URL:
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    engine = create_async_engine(
+        db_url,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        echo=settings.DEBUG,
+    )
+else:
+    # Use SQLite as fallback if DATABASE_URL not set
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///./app.db",
+        pool_pre_ping=True,
+        echo=settings.DEBUG,
+    )
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(

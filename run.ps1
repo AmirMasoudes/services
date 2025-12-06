@@ -1,8 +1,7 @@
-# ========================================
-# VPN Bot Management System - Setup Script
-# ========================================
+# VPN Bot Management System - Automated Setup Script
 # Production-ready PowerShell automation
 # Compatible with PowerShell 5+ and PowerShell 7
+# ASCII-only, no special characters
 
 #Requires -Version 5.0
 
@@ -27,7 +26,11 @@ function Write-Error {
     param([string]$Message)
     Write-Host "[ERROR] $Message" -ForegroundColor Red
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path $ErrorLog -Value "$timestamp - ERROR: $Message" -ErrorAction SilentlyContinue
+    try {
+        Add-Content -Path $ErrorLog -Value "$timestamp - ERROR: $Message" -ErrorAction SilentlyContinue
+    } catch {
+        # Ignore log write errors
+    }
 }
 
 function Write-Warning {
@@ -79,7 +82,6 @@ function Ask-Value {
         [string]$Prompt,
         [string]$DefaultValue = "",
         [switch]$IsPassword = $false,
-        [switch]$IsBoolean = $false,
         [switch]$Required = $true
     )
     
@@ -104,161 +106,119 @@ function Ask-Value {
     if ([string]::IsNullOrWhiteSpace($value)) {
         if ($Required -and [string]::IsNullOrWhiteSpace($DefaultValue)) {
             Write-Error "This field is required!"
-            return Ask-Value -Prompt $Prompt -DefaultValue $DefaultValue -IsPassword:$IsPassword -IsBoolean:$IsBoolean -Required:$Required
+            return Ask-Value -Prompt $Prompt -DefaultValue $DefaultValue -IsPassword:$IsPassword -Required:$Required
         }
         $value = $DefaultValue
-    }
-    
-    if ($IsBoolean) {
-        $lowerValue = $value.ToLower()
-        return ($lowerValue -eq "true" -or $lowerValue -eq "1" -or $lowerValue -eq "yes" -or $lowerValue -eq "y")
     }
     
     return $value
 }
 
-function Collect-Configuration {
+function Generate-SecretKey {
+    try {
+        $bytes = New-Object byte[] 50
+        $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+        $rng.GetBytes($bytes)
+        $secret = [Convert]::ToBase64String($bytes)
+        $secret = $secret -replace '[+/=]', { param($c) if ($c -eq '+') { '-' } elseif ($c -eq '/') { '_' } else { '' } }
+        return $secret
+    } catch {
+        $fallback = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 50 | ForEach-Object {[char]$_})
+        return $fallback
+    }
+}
+
+function Collect-MinimalConfig {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Magenta
-    Write-Host "Configuration Collection" -ForegroundColor Magenta
+    Write-Host "Minimal Configuration (3 inputs only)" -ForegroundColor Magenta
     Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "Only 3 values required. Everything else will be auto-generated." -ForegroundColor Yellow
     Write-Host ""
     
     $config = @{}
     
-    Write-Host "Django Configuration:" -ForegroundColor Yellow
-    $config.SECRET_KEY = Ask-Value -Prompt "Django SECRET_KEY" -Required $true
-    $debugInput = Ask-Value -Prompt "DEBUG (True/False)" -DefaultValue "False" -IsBoolean
-    $config.DEBUG = if ($debugInput) { "True" } else { "False" }
-    $config.ALLOWED_HOSTS = Ask-Value -Prompt "ALLOWED_HOSTS (comma-separated)" -DefaultValue "localhost,127.0.0.1"
+    $config.SERVER_IP = Ask-Value -Prompt "Enter server IP" -DefaultValue "127.0.0.1" -Required $true
+    $config.PANEL_USERNAME = Ask-Value -Prompt "Enter panel username" -DefaultValue "admin" -Required $true
+    $config.PANEL_PASSWORD = Ask-Value -Prompt "Enter panel password" -IsPassword -Required $true
     
     Write-Host ""
-    Write-Host "Telegram Bot Configuration:" -ForegroundColor Yellow
-    $config.ADMIN_BOT_TOKEN = Ask-Value -Prompt "Admin bot token" -Required $true
-    $config.USER_BOT_TOKEN = Ask-Value -Prompt "User bot token" -Required $true
-    $config.ADMIN_PASSWORD = Ask-Value -Prompt "Admin password" -IsPassword -Required $true
-    $config.ADMIN_USER_IDS = Ask-Value -Prompt "Admin user IDs (comma-separated)" -Required $true
+    Write-Info "Auto-generating all other configuration values..."
     
-    Write-Host ""
-    Write-Host "X-UI Panel Configuration:" -ForegroundColor Yellow
-    $config.XUI_DEFAULT_HOST = Ask-Value -Prompt "X-UI host" -DefaultValue "localhost"
-    $config.XUI_DEFAULT_PORT = Ask-Value -Prompt "X-UI port" -DefaultValue "2053"
-    $config.XUI_DEFAULT_USERNAME = Ask-Value -Prompt "X-UI username" -Required $true
-    $config.XUI_DEFAULT_PASSWORD = Ask-Value -Prompt "X-UI password" -IsPassword -Required $true
-    $config.XUI_WEB_BASE_PATH = Ask-Value -Prompt "X-UI web base path" -DefaultValue "/app/"
-    $xuiSsl = Ask-Value -Prompt "X-UI use SSL (True/False)" -DefaultValue "True" -IsBoolean
-    $config.XUI_USE_SSL = if ($xuiSsl) { "True" } else { "False" }
-    $xuiVerify = Ask-Value -Prompt "X-UI verify SSL (True/False)" -DefaultValue "False" -IsBoolean
-    $config.XUI_VERIFY_SSL = if ($xuiVerify) { "True" } else { "False" }
-    $config.XUI_TIMEOUT = Ask-Value -Prompt "X-UI timeout (seconds)" -DefaultValue "30"
+    $config.SECRET_KEY = Generate-SecretKey
+    $config.FASTAPI_SECRET_KEY = Generate-SecretKey
+    $config.DEBUG = "False"
+    $config.ALLOWED_HOSTS = "$($config.SERVER_IP),localhost,127.0.0.1"
+    $config.DB_ENGINE = "django.db.backends.sqlite3"
+    $config.DB_NAME = "db.sqlite3"
+    $config.DB_USER = ""
+    $config.DB_PASSWORD = ""
+    $config.DB_HOST = ""
+    $config.DB_PORT = ""
+    $config.DATABASE_URL = ""
+    $config.DATABASE_POOL_SIZE = "10"
+    $config.DATABASE_MAX_OVERFLOW = "20"
+    $config.CSRF_TRUSTED_ORIGINS = "http://$($config.SERVER_IP),https://$($config.SERVER_IP),http://localhost,https://localhost"
+    $config.SECURE_HSTS_SECONDS = "0"
+    $config.SECURE_SSL_REDIRECT = "False"
+    $config.SESSION_COOKIE_SECURE = "False"
+    $config.CSRF_COOKIE_SECURE = "False"
+    $config.ADMIN_BOT_TOKEN = "YOUR_ADMIN_BOT_TOKEN_HERE"
+    $config.USER_BOT_TOKEN = "YOUR_USER_BOT_TOKEN_HERE"
+    $config.ADMIN_PASSWORD = $config.PANEL_PASSWORD
+    $config.ADMIN_USER_IDS = "123456789"
+    $config.XUI_DEFAULT_HOST = $config.SERVER_IP
+    $config.XUI_DEFAULT_PORT = "2053"
+    $config.XUI_DEFAULT_USERNAME = $config.PANEL_USERNAME
+    $config.XUI_DEFAULT_PASSWORD = $config.PANEL_PASSWORD
+    $config.XUI_WEB_BASE_PATH = "/app/"
+    $config.XUI_USE_SSL = "False"
+    $config.XUI_VERIFY_SSL = "False"
+    $config.XUI_TIMEOUT = "30"
+    $config.SUI_HOST = $config.SERVER_IP
+    $config.SUI_PORT = "2095"
+    $config.SUI_USE_SSL = "False"
+    $config.SUI_BASE_PATH = "/app"
+    $config.SUI_API_TOKEN = ""
+    $config.SUI_BASE_URL = "http://$($config.SERVER_IP):2095"
+    $config.SUI_API_KEY = ""
+    $config.SERVER_DOMAIN = $config.SERVER_IP
+    $config.SERVER_PORT = "8000"
+    $config.SERVER_PROTOCOL = "http"
+    $config.DEFAULT_PROTOCOL = "vless"
+    $config.MIN_PORT = "10000"
+    $config.MAX_PORT = "65000"
+    $config.TLS_ENABLED = "True"
+    $config.REALITY_ENABLED = "True"
+    $config.REALITY_DEST = "www.aparat.com:443"
+    $config.REALITY_SERVER_NAMES = "www.aparat.com"
+    $config.REALITY_PRIVATE_KEY = Generate-SecretKey
+    $config.WS_PATH = "/"
+    $config.WS_HOST = ""
+    $config.TRIAL_HOURS = "24"
+    $config.PAID_DAYS = "30"
+    $config.EXPIRY_WARNING_HOURS = "6"
+    $config.EXPIRY_WARNING_MESSAGE = "Config expires in {hours} hours"
+    $config.TRIAL_INBOUND_PREFIX = "TrialBot"
+    $config.PAID_INBOUND_PREFIX = "PaidBot"
+    $config.USER_INBOUND_PREFIX = "UserBot"
+    $config.CONNECTION_TIMEOUT = "15"
+    $config.RETRY_ATTEMPTS = "5"
+    $config.REDIS_URL = "redis://localhost:6379/0"
+    $config.REDIS_CACHE_TTL = "3600"
+    $config.CELERY_BROKER_URL = "redis://localhost:6379/1"
+    $config.CELERY_RESULT_BACKEND = "redis://localhost:6379/2"
+    $config.ENVIRONMENT = "development"
+    $config.FASTAPI_HOST = "0.0.0.0"
+    $config.FASTAPI_PORT = "8001"
+    $config.ALGORITHM = "HS256"
+    $config.ACCESS_TOKEN_EXPIRE_MINUTES = "30"
+    $config.REFRESH_TOKEN_EXPIRE_DAYS = "7"
+    $config.CORS_ORIGINS = "http://localhost:3000,http://localhost:5173"
+    $config.CORS_ALLOW_CREDENTIALS = "True"
     
-    Write-Host ""
-    Write-Host "S-UI Panel Configuration:" -ForegroundColor Yellow
-    $config.SUI_HOST = Ask-Value -Prompt "S-UI host" -DefaultValue "localhost"
-    $config.SUI_PORT = Ask-Value -Prompt "S-UI port" -DefaultValue "2095"
-    $suiSsl = Ask-Value -Prompt "S-UI use SSL (True/False)" -DefaultValue "False" -IsBoolean
-    $config.SUI_USE_SSL = if ($suiSsl) { "True" } else { "False" }
-    $config.SUI_BASE_PATH = Ask-Value -Prompt "S-UI base path" -DefaultValue "/app"
-    $config.SUI_API_TOKEN = Ask-Value -Prompt "S-UI API token" -DefaultValue ""
-    $config.SUI_BASE_URL = Ask-Value -Prompt "S-UI base URL" -DefaultValue "http://localhost:2095"
-    $config.SUI_API_KEY = Ask-Value -Prompt "S-UI API key" -DefaultValue ""
-    
-    Write-Host ""
-    Write-Host "Server Configuration:" -ForegroundColor Yellow
-    $config.SERVER_IP = Ask-Value -Prompt "Server IP" -DefaultValue "127.0.0.1"
-    $config.SERVER_DOMAIN = Ask-Value -Prompt "Domain" -DefaultValue "localhost"
-    $config.SERVER_PORT = Ask-Value -Prompt "Server port" -DefaultValue "8000"
-    $config.SERVER_PROTOCOL = Ask-Value -Prompt "Server protocol (http/https)" -DefaultValue "http"
-    
-    Write-Host ""
-    Write-Host "VPN Protocol Configuration:" -ForegroundColor Yellow
-    $config.DEFAULT_PROTOCOL = Ask-Value -Prompt "Default protocol (vless/vmess/trojan)" -DefaultValue "vless"
-    $config.MIN_PORT = Ask-Value -Prompt "Minimum port" -DefaultValue "10000"
-    $config.MAX_PORT = Ask-Value -Prompt "Maximum port" -DefaultValue "65000"
-    $tlsEnabled = Ask-Value -Prompt "TLS enabled (True/False)" -DefaultValue "True" -IsBoolean
-    $config.TLS_ENABLED = if ($tlsEnabled) { "True" } else { "False" }
-    $realityEnabled = Ask-Value -Prompt "Reality enabled (True/False)" -DefaultValue "True" -IsBoolean
-    $config.REALITY_ENABLED = if ($realityEnabled) { "True" } else { "False" }
-    $config.REALITY_DEST = Ask-Value -Prompt "Reality destination" -DefaultValue "www.aparat.com:443"
-    $config.REALITY_SERVER_NAMES = Ask-Value -Prompt "Reality server names" -DefaultValue "www.aparat.com"
-    $config.REALITY_PRIVATE_KEY = Ask-Value -Prompt "Reality private key" -Required $true
-    $config.WS_PATH = Ask-Value -Prompt "WebSocket path" -DefaultValue "/"
-    $config.WS_HOST = Ask-Value -Prompt "WebSocket host" -DefaultValue ""
-    
-    Write-Host ""
-    Write-Host "Trial and Plan Configuration:" -ForegroundColor Yellow
-    $config.TRIAL_HOURS = Ask-Value -Prompt "Trial hours" -DefaultValue "24"
-    $config.PAID_DAYS = Ask-Value -Prompt "Paid days" -DefaultValue "30"
-    $config.EXPIRY_WARNING_HOURS = Ask-Value -Prompt "Expiry warning hours" -DefaultValue "6"
-    $config.EXPIRY_WARNING_MESSAGE = Ask-Value -Prompt "Expiry warning message" -DefaultValue "Config expires in {hours} hours"
-    
-    Write-Host ""
-    Write-Host "Naming Prefixes:" -ForegroundColor Yellow
-    $config.TRIAL_INBOUND_PREFIX = Ask-Value -Prompt "Trial inbound prefix" -DefaultValue "TrialBot"
-    $config.PAID_INBOUND_PREFIX = Ask-Value -Prompt "Paid inbound prefix" -DefaultValue "PaidBot"
-    $config.USER_INBOUND_PREFIX = Ask-Value -Prompt "User inbound prefix" -DefaultValue "UserBot"
-    
-    Write-Host ""
-    Write-Host "Connection Settings:" -ForegroundColor Yellow
-    $config.CONNECTION_TIMEOUT = Ask-Value -Prompt "Connection timeout (seconds)" -DefaultValue "15"
-    $config.RETRY_ATTEMPTS = Ask-Value -Prompt "Retry attempts" -DefaultValue "5"
-    
-    Write-Host ""
-    Write-Host "Database Configuration:" -ForegroundColor Yellow
-    $dbEngine = Ask-Value -Prompt "Database engine (sqlite/postgresql)" -DefaultValue "sqlite"
-    if ($dbEngine -eq "postgresql") {
-        $config.DB_ENGINE = "django.db.backends.postgresql"
-        $config.DB_NAME = Ask-Value -Prompt "Database name" -Required $true
-        $config.DB_USER = Ask-Value -Prompt "Database user" -Required $true
-        $config.DB_PASSWORD = Ask-Value -Prompt "Database password" -IsPassword -Required $true
-        $config.DB_HOST = Ask-Value -Prompt "Database host" -DefaultValue "localhost"
-        $config.DB_PORT = Ask-Value -Prompt "Database port" -DefaultValue "5432"
-        $config.DATABASE_URL = "postgresql+asyncpg://$($config.DB_USER):$($config.DB_PASSWORD)@$($config.DB_HOST):$($config.DB_PORT)/$($config.DB_NAME)"
-        $config.DATABASE_POOL_SIZE = Ask-Value -Prompt "Database pool size" -DefaultValue "10"
-        $config.DATABASE_MAX_OVERFLOW = Ask-Value -Prompt "Database max overflow" -DefaultValue "20"
-    } else {
-        $config.DB_ENGINE = "django.db.backends.sqlite3"
-        $config.DB_NAME = "db.sqlite3"
-        $config.DB_USER = ""
-        $config.DB_PASSWORD = ""
-        $config.DB_HOST = ""
-        $config.DB_PORT = ""
-        $config.DATABASE_URL = ""
-        $config.DATABASE_POOL_SIZE = ""
-        $config.DATABASE_MAX_OVERFLOW = ""
-    }
-    
-    Write-Host ""
-    Write-Host "Redis Configuration:" -ForegroundColor Yellow
-    $config.REDIS_URL = Ask-Value -Prompt "Redis URL" -DefaultValue "redis://localhost:6379/0"
-    $config.REDIS_CACHE_TTL = Ask-Value -Prompt "Redis cache TTL (seconds)" -DefaultValue "3600"
-    $config.CELERY_BROKER_URL = Ask-Value -Prompt "Celery broker URL" -DefaultValue "redis://localhost:6379/1"
-    $config.CELERY_RESULT_BACKEND = Ask-Value -Prompt "Celery result backend URL" -DefaultValue "redis://localhost:6379/2"
-    
-    Write-Host ""
-    Write-Host "FastAPI Configuration:" -ForegroundColor Yellow
-    $config.ENVIRONMENT = Ask-Value -Prompt "Environment (development/production)" -DefaultValue "development"
-    $config.FASTAPI_HOST = Ask-Value -Prompt "FastAPI host" -DefaultValue "0.0.0.0"
-    $config.FASTAPI_PORT = Ask-Value -Prompt "FastAPI port" -DefaultValue "8001"
-    $config.FASTAPI_SECRET_KEY = Ask-Value -Prompt "FastAPI SECRET_KEY" -DefaultValue $config.SECRET_KEY
-    $config.ALGORITHM = Ask-Value -Prompt "JWT algorithm" -DefaultValue "HS256"
-    $config.ACCESS_TOKEN_EXPIRE_MINUTES = Ask-Value -Prompt "Access token expire minutes" -DefaultValue "30"
-    $config.REFRESH_TOKEN_EXPIRE_DAYS = Ask-Value -Prompt "Refresh token expire days" -DefaultValue "7"
-    $config.CORS_ORIGINS = Ask-Value -Prompt "CORS origins (comma-separated)" -DefaultValue "http://localhost:3000,http://localhost:5173"
-    $corsCreds = Ask-Value -Prompt "CORS allow credentials (True/False)" -DefaultValue "True" -IsBoolean
-    $config.CORS_ALLOW_CREDENTIALS = if ($corsCreds) { "True" } else { "False" }
-    
-    Write-Host ""
-    Write-Host "Security Settings:" -ForegroundColor Yellow
-    $config.CSRF_TRUSTED_ORIGINS = Ask-Value -Prompt "CSRF trusted origins (comma-separated)" -DefaultValue "http://localhost,https://localhost"
-    $config.SECURE_HSTS_SECONDS = Ask-Value -Prompt "Secure HSTS seconds" -DefaultValue "0"
-    $secureSsl = Ask-Value -Prompt "Secure SSL redirect (True/False)" -DefaultValue "False" -IsBoolean
-    $config.SECURE_SSL_REDIRECT = if ($secureSsl) { "True" } else { "False" }
-    $sessionSecure = Ask-Value -Prompt "Session cookie secure (True/False)" -DefaultValue "False" -IsBoolean
-    $config.SESSION_COOKIE_SECURE = if ($sessionSecure) { "True" } else { "False" }
-    $csrfSecure = Ask-Value -Prompt "CSRF cookie secure (True/False)" -DefaultValue "False" -IsBoolean
-    $config.CSRF_COOKIE_SECURE = if ($csrfSecure) { "True" } else { "False" }
-    
+    Write-Success "Configuration generated"
     return $config
 }
 
@@ -274,6 +234,7 @@ function Generate-EnvFile {
     $envContent = @"
 # Auto-generated environment configuration
 # Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+# Only 3 values were provided by user, rest auto-generated
 
 # Django Core
 SECRET_KEY=$($Config.SECRET_KEY)
@@ -288,7 +249,7 @@ DB_PASSWORD=$($Config.DB_PASSWORD)
 DB_HOST=$($Config.DB_HOST)
 DB_PORT=$($Config.DB_PORT)
 
-# FastAPI Database
+# FastAPI Database (optional - uses SQLite fallback if empty)
 DATABASE_URL=$($Config.DATABASE_URL)
 DATABASE_POOL_SIZE=$($Config.DATABASE_POOL_SIZE)
 DATABASE_MAX_OVERFLOW=$($Config.DATABASE_MAX_OVERFLOW)
@@ -443,17 +404,17 @@ function Install-Dependencies {
         }
         
         Write-Info "Upgrading pip..."
-        & $pythonExe -m pip install --upgrade pip --quiet
+        & $pythonExe -m pip install --upgrade pip --quiet 2>&1 | Out-Null
         
         $requirementsFile = Join-Path $ScriptRoot "requirements.txt"
         if (Test-Path $requirementsFile) {
-            Write-Info "Installing requirements from requirements.txt..."
-            & $pipExe install -r $requirementsFile
+            Write-Info "Installing Django requirements..."
+            & $pipExe install -r $requirementsFile 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Error "Failed to install requirements"
+                Write-Error "Failed to install Django requirements"
                 throw "Requirements installation failed"
             }
-            Write-Success "Requirements installed"
+            Write-Success "Django requirements installed"
         } else {
             Write-Warning "requirements.txt not found"
         }
@@ -461,21 +422,17 @@ function Install-Dependencies {
         $backendRequirements = Join-Path $ScriptRoot "backend\requirements.txt"
         if (Test-Path $backendRequirements) {
             Write-Info "Installing FastAPI requirements..."
-            & $pipExe install -r $backendRequirements
+            & $pipExe install -r $backendRequirements 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "FastAPI requirements installation had issues"
+                Write-Warning "FastAPI requirements installation had issues, continuing..."
             } else {
                 Write-Success "FastAPI requirements installed"
             }
         }
         
-        if ($Config.DB_ENGINE -eq "django.db.backends.postgresql") {
-            Write-Info "Installing PostgreSQL driver..."
-            & $pipExe install psycopg2-binary --quiet
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "PostgreSQL driver installed"
-            }
-        }
+        Write-Info "Installing additional dependencies..."
+        & $pipExe install aiosqlite --quiet 2>&1 | Out-Null
+        
     } catch {
         Write-Error "Dependency installation failed: $_"
         throw
@@ -499,17 +456,19 @@ function Init-Django {
         }
         
         Write-Info "Creating migrations..."
-        & $pythonExe $managePy makemigrations 2>&1 | Out-File -FilePath (Join-Path $LogDir "django_makemigrations.log")
+        $makemigrationsLog = Join-Path $LogDir "django_makemigrations.log"
+        & $pythonExe $managePy makemigrations 2>&1 | Out-File -FilePath $makemigrationsLog
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning "makemigrations had issues"
+            Write-Warning "makemigrations had issues, check log: $makemigrationsLog"
         } else {
             Write-Success "Migrations created"
         }
         
         Write-Info "Applying migrations..."
-        & $pythonExe $managePy migrate 2>&1 | Out-File -FilePath (Join-Path $LogDir "django_migrate.log")
+        $migrateLog = Join-Path $LogDir "django_migrate.log"
+        & $pythonExe $managePy migrate 2>&1 | Out-File -FilePath $migrateLog
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "Migration failed"
+            Write-Error "Migration failed, check log: $migrateLog"
             throw "Django migration failed"
         }
         Write-Success "Migrations applied"
@@ -523,6 +482,42 @@ function Init-Django {
     } catch {
         Write-Error "Django initialization failed: $_"
         throw
+    }
+}
+
+function Init-FastAPI {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host "Initializing FastAPI" -ForegroundColor Magenta
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host ""
+    
+    try {
+        $pythonExe = Join-Path $VenvPath "Scripts\python.exe"
+        $alembicIni = Join-Path $ScriptRoot "backend\alembic.ini"
+        
+        if (-not (Test-Path $alembicIni)) {
+            Write-Warning "alembic.ini not found, skipping FastAPI database setup"
+            return
+        }
+        
+        Write-Info "Running Alembic migrations..."
+        Push-Location (Join-Path $ScriptRoot "backend")
+        try {
+            $alembicLog = Join-Path $LogDir "alembic_upgrade.log"
+            & $pythonExe -m alembic upgrade head 2>&1 | Out-File -FilePath $alembicLog
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Alembic migration had issues, check log: $alembicLog"
+                Write-Info "FastAPI will use SQLite fallback if DATABASE_URL is not set"
+            } else {
+                Write-Success "Alembic migrations applied"
+            }
+        } finally {
+            Pop-Location
+        }
+    } catch {
+        Write-Warning "FastAPI initialization had issues: $_"
+        Write-Info "FastAPI will continue with fallback configuration"
     }
 }
 
@@ -558,20 +553,28 @@ function Start-Services {
             Write-Success "FastAPI server started (Terminal 2)"
         }
         
-        $botFiles = Get-ChildItem -Path $ScriptRoot -Filter "*bot*.py" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notlike "*__pycache__*" }
-        if ($botFiles) {
+        $userBot = Join-Path $ScriptRoot "bot\user_bot.py"
+        $adminBot = Join-Path $ScriptRoot "bot\admin_bot.py"
+        $botFiles = @()
+        if (Test-Path $userBot) { $botFiles += $userBot }
+        if (Test-Path $adminBot) { $botFiles += $adminBot }
+        
+        if ($botFiles.Count -gt 0) {
             Write-Info "Starting bot services in new window..."
             $botLog = Join-Path $LogDir "bots.log"
             $botCommands = @()
             foreach ($botFile in $botFiles) {
-                $botCommands += "Write-Host 'Starting $($botFile.Name)' -ForegroundColor Cyan; `"$pythonExe`" `"$($botFile.FullName)`" 2>&1 | Tee-Object -FilePath `"$botLog`" -Append"
+                $botName = Split-Path $botFile -Leaf
+                $botCommands += "Write-Host 'Starting $botName' -ForegroundColor Cyan; `"$pythonExe`" `"$botFile`" 2>&1 | Tee-Object -FilePath `"$botLog`" -Append"
             }
-            $botCmd = "cd `"$ScriptRoot`"; " + ($botCommands -join "; ")
-            Start-Process powershell -ArgumentList "-NoExit", "-Command", $botCmd
-            Start-Sleep -Seconds 2
-            Write-Success "Bot services started (Terminal 3)"
+            if ($botCommands.Count -gt 0) {
+                $botCmd = "cd `"$ScriptRoot`"; " + ($botCommands -join "; ")
+                Start-Process powershell -ArgumentList "-NoExit", "-Command", $botCmd
+                Start-Sleep -Seconds 2
+                Write-Success "Bot services started (Terminal 3)"
+            }
         } else {
-            Write-Warning "No bot files found"
+            Write-Warning "No bot files found (user_bot.py or admin_bot.py)"
         }
     } catch {
         Write-Error "Service startup failed: $_"
@@ -589,13 +592,14 @@ function Main {
         Initialize-LogDirectory
         Test-PythonInstalled
         
-        $config = Collect-Configuration
+        $config = Collect-MinimalConfig
         Generate-EnvFile -Config $config
         
         Setup-Venv
         Install-Dependencies -Config $config
         
         Init-Django
+        Init-FastAPI
         Start-Services -Config $config
         
         Write-Host ""
