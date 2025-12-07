@@ -36,7 +36,7 @@ httpx==0.25.2 (single instance)
 aiohttp==3.9.1
 pydantic==2.5.0
 pydantic-settings==2.1.0
-email-validator==2.1.0
+email-validator==2.2.0.post1
 python-telegram-bot==20.7
 python-dateutil==2.8.2
 pytz==2023.3

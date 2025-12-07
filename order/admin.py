@@ -16,8 +16,8 @@ class PaymentInline(admin.TabularInline):
 @admin.register(OrderUserModel)
 class OrderUserAdmin(admin.ModelAdmin):
     list_display = ('user_display', 'plan_display', 'is_active', 'start_plane_at', 'end_plane_at', 'remaining_days', 'created_at')
-    list_filter = ('is_active', 'created_at', 'plans', 'start_plane_at', 'end_plane_at')
-    search_fields = ('user__full_name', 'user__username_tel', 'plans__name')
+    list_filter = ('is_active', 'created_at', 'plan', 'start_plane_at', 'end_plane_at')
+    search_fields = ('user__full_name', 'user__username_tel', 'plan__name')
     ordering = ('-created_at',)
     readonly_fields = ('start_plane_at', 'end_plane_at', 'created_at', 'updated_at', 'remaining_days_display')
     inlines = [PaymentInline]
@@ -27,7 +27,7 @@ class OrderUserAdmin(admin.ModelAdmin):
             'fields': ('user',)
         }),
         ('اطلاعات پلن', {
-            'fields': ('plans',)
+            'fields': ('plan',)
         }),
         ('وضعیت سفارش', {
             'fields': ('is_active',)
@@ -55,25 +55,25 @@ class OrderUserAdmin(admin.ModelAdmin):
     
     def plan_display(self, obj):
         """نمایش اطلاعات پلن"""
-        if obj.plans:
+        if obj.plan:
             try:
                 # Use locale formatting for better compatibility
-                formatted_price = locale.format_string("%d", int(obj.plans.price) if obj.plans.price is not None else 0, grouping=True)
+                formatted_price = locale.format_string("%d", int(obj.plan.price) if obj.plan.price is not None else 0, grouping=True)
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.plans.name,
+                    obj.plan.name,
                     formatted_price
                 )
             except (ValueError, TypeError):
                 # Fallback to simple formatting
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.plans.name,
-                    str(obj.plans.price) if obj.plans.price is not None else '0'
+                    obj.plan.name,
+                    str(obj.plan.price) if obj.plan.price is not None else '0'
                 )
         return '-'
     plan_display.short_description = 'پلن'
-    plan_display.admin_order_field = 'plans__name'
+    plan_display.admin_order_field = 'plan__name'
     
     def remaining_days(self, obj):
         """روزهای باقی‌مانده"""
@@ -100,7 +100,7 @@ class OrderUserAdmin(admin.ModelAdmin):
     remaining_days_display.short_description = 'روزهای باقی‌مانده'
     
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('user', 'plans')
+        return super().get_queryset(request).select_related('user', 'plan')
     
     actions = ['activate_orders', 'deactivate_orders', 'extend_orders_30_days']
     
@@ -132,7 +132,7 @@ class OrderUserAdmin(admin.ModelAdmin):
 class PaymentAdmin(admin.ModelAdmin):
     list_display = ('user_display', 'order_display', 'code_pay', 'payment_status', 'created_at')
     list_filter = ('is_active', 'rejected', 'created_at')
-    search_fields = ('user__full_name', 'user__username_tel', 'code_pay', 'order__plans__name')
+    search_fields = ('user__full_name', 'user__username_tel', 'code_pay', 'order__plan__name')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at')
     
@@ -169,21 +169,21 @@ class PaymentAdmin(admin.ModelAdmin):
     
     def order_display(self, obj):
         """نمایش اطلاعات سفارش"""
-        if obj.order and obj.order.plans:
+        if obj.order and obj.order.plan:
             try:
                 # Use locale formatting for better compatibility
-                formatted_price = locale.format_string("%d", int(obj.order.plans.price) if obj.order.plans.price is not None else 0, grouping=True)
+                formatted_price = locale.format_string("%d", int(obj.order.plan.price) if obj.order.plan.price is not None else 0, grouping=True)
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.order.plans.name,
+                    obj.order.plan.name,
                     formatted_price
                 )
             except (ValueError, TypeError):
                 # Fallback to simple formatting
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.order.plans.name,
-                    str(obj.order.plans.price) if obj.order.plans.price is not None else '0'
+                    obj.order.plan.name,
+                    str(obj.order.plan.price) if obj.order.plan.price is not None else '0'
                 )
         return '-'
     order_display.short_description = 'سفارش'
@@ -199,7 +199,7 @@ class PaymentAdmin(admin.ModelAdmin):
     payment_status.short_description = 'وضعیت پرداخت'
     
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('user', 'order__plans')
+        return super().get_queryset(request).select_related('user', 'order__plan')
     
     actions = ['approve_payments', 'reject_payments', 'mark_as_pending']
     

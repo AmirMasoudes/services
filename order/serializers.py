@@ -5,11 +5,11 @@ from plan.serializers import PlanSerializer
 
 class OrderSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    plans = PlanSerializer(read_only=True)
+    plan = PlanSerializer(read_only=True)
     
     class Meta:
         model = OrderUserModel
-        fields = ['id', 'user', 'plans', 'is_active', 'start_plane_at', 'end_plane_at', 'created_at']
+        fields = ['id', 'user', 'plan', 'is_active', 'start_plane_at', 'end_plane_at', 'created_at']
         read_only_fields = ['id', 'start_plane_at', 'end_plane_at', 'created_at']
 
 class PaymentSerializer(serializers.ModelSerializer):

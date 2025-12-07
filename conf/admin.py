@@ -9,7 +9,7 @@ import locale
 class ConfigAdmin(admin.ModelAdmin):
     list_display = ('user_display', 'order_display', 'is_active', 'created_at')
     list_filter = ('is_active', 'created_at')
-    search_fields = ('user__full_name', 'user__username_tel', 'config', 'order__plans__name')
+    search_fields = ('user__full_name', 'user__username_tel', 'config', 'order__plan__name')
     ordering = ('-created_at',)
     readonly_fields = ('created_at', 'updated_at')
     
@@ -46,27 +46,27 @@ class ConfigAdmin(admin.ModelAdmin):
     
     def order_display(self, obj):
         """نمایش اطلاعات سفارش"""
-        if obj.order and obj.order.plans:
+        if obj.order and obj.order.plan:
             try:
                 # Use locale formatting for better compatibility
-                formatted_price = locale.format_string("%d", int(obj.order.plans.price) if obj.order.plans.price is not None else 0, grouping=True)
+                formatted_price = locale.format_string("%d", int(obj.order.plan.price) if obj.order.plan.price is not None else 0, grouping=True)
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.order.plans.name,
+                    obj.order.plan.name,
                     formatted_price
                 )
             except (ValueError, TypeError):
                 # Fallback to simple formatting
                 return format_html(
                     '<strong>{}</strong><br><small>{} تومان</small>',
-                    obj.order.plans.name,
-                    str(obj.order.plans.price) if obj.order.plans.price is not None else '0'
+                    obj.order.plan.name,
+                    str(obj.order.plan.price) if obj.order.plan.price is not None else '0'
                 )
         return '-'
     order_display.short_description = 'سفارش'
     
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('user', 'order__plans')
+        return super().get_queryset(request).select_related('user', 'order__plan')
     
     actions = ['activate_configs', 'deactivate_configs']
     

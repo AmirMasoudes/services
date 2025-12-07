@@ -12,7 +12,9 @@ class MessageDirectory(BaseModel, SoftDeleteModel, TimeStampMixin):
     )
 
     def __str__(self):
-        return f"{self.admin.username} ↔ {self.user.username}"
+        admin_username = self.admin.username if self.admin and self.admin.username else 'N/A'
+        user_username = self.user.username if self.user and self.user.username else 'N/A'
+        return f"{admin_username} ↔ {user_username}"
 
 
 class MessageModel(BaseModel, SoftDeleteModel, TimeStampMixin):

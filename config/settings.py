@@ -102,12 +102,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Database configuration from environment
-DB_ENGINE = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
-DB_NAME = os.environ.get('DB_NAME', str(BASE_DIR / 'db.sqlite3'))
-DB_USER = os.environ.get('DB_USER', '')
-DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
-DB_HOST = os.environ.get('DB_HOST', '')
-DB_PORT = os.environ.get('DB_PORT', '')
+# Support both DB_* and DATABASE_* naming conventions
+DB_ENGINE = os.environ.get('DB_ENGINE') or os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3')
+DB_NAME = os.environ.get('DB_NAME') or os.environ.get('DATABASE_NAME', str(BASE_DIR / 'db.sqlite3'))
+DB_USER = os.environ.get('DB_USER') or os.environ.get('DATABASE_USER', '')
+DB_PASSWORD = os.environ.get('DB_PASSWORD') or os.environ.get('DATABASE_PASSWORD', '')
+DB_HOST = os.environ.get('DB_HOST') or os.environ.get('DATABASE_HOST', '')
+DB_PORT = os.environ.get('DB_PORT') or os.environ.get('DATABASE_PORT', '')
 
 if DB_ENGINE == 'django.db.backends.sqlite3':
     DATABASES = {
@@ -117,14 +118,38 @@ if DB_ENGINE == 'django.db.backends.sqlite3':
         }
     }
 elif DB_ENGINE in ['django.db.backends.postgresql', 'django.db.backends.postgresql_psycopg2']:
+    # Validate required PostgreSQL settings
+    if not DB_NAME or not DB_USER or not DB_PASSWORD:
+        raise ValueError(
+            "PostgreSQL requires DB_NAME, DB_USER, and DB_PASSWORD to be set in .env file. "
+            "Current values: DB_NAME={}, DB_USER={}, DB_PASSWORD={}".format(
+                'SET' if DB_NAME else 'NOT SET',
+                'SET' if DB_USER else 'NOT SET',
+                'SET' if DB_PASSWORD else 'NOT SET'
+            )
+        )
+    
+    # Determine host - use 'postgres' for Docker, 'localhost' for local
+    # Check if we're in Docker by looking for DB_HOST or environment
+    db_host = DB_HOST or 'localhost'
+    if not DB_HOST and os.environ.get('DOCKER_CONTAINER'):
+        db_host = 'postgres'
+    elif DB_HOST == 'postgres':
+        # Explicitly set for Docker
+        db_host = 'postgres'
+    
     DATABASES = {
         'default': {
-            'ENGINE': DB_ENGINE,
+            'ENGINE': 'django.db.backends.postgresql',
             'NAME': DB_NAME,
             'USER': DB_USER,
             'PASSWORD': DB_PASSWORD,
-            'HOST': DB_HOST or 'localhost',
+            'HOST': db_host,
             'PORT': DB_PORT or '5432',
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+            'CONN_MAX_AGE': 600,
         }
     }
 else:

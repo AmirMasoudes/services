@@ -23,7 +23,12 @@ from app.models import *  # Import all models
 config = context.config
 
 # Override sqlalchemy.url with settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"))
+if settings.DATABASE_URL:
+    db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    config.set_main_option("sqlalchemy.url", db_url)
+else:
+    # Fallback to SQLite for Alembic
+    config.set_main_option("sqlalchemy.url", "sqlite:///./app.db")
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
